@@ -18,9 +18,6 @@ pipeline {
         IMAGE = 'mouadhfersi/edugame-auth-backend'
         CONTAINER_NAME = 'edugame-auth-backend'
         APP_PORT = '8081'
-        K8S_NAMESPACE = 'edugame'
-        K8S_DEPLOYMENT = 'edugame-auth-backend'
-        K8S_CONTAINER = 'edugame-auth-backend'
         SONAR_PROJECT_KEY = 'edugame-auth-backend'
         SONAR_PROJECT_NAME = 'EduGame Auth Backend'
     }
@@ -131,18 +128,21 @@ pipeline {
             steps {
                 sh '''
                     set -eu
-                    echo "Deploiement de $IMAGE:$TAG dans le namespace $K8S_NAMESPACE"
+                    echo "Deploiement Docker de $IMAGE:$TAG"
 
-                    # Mise a jour de l'image du Deployment Kubernetes
-                    kubectl set image "deployment/$K8S_DEPLOYMENT" \
-                      "$K8S_CONTAINER=$IMAGE:$TAG" \
-                      -n "$K8S_NAMESPACE"
+                    docker pull "$IMAGE:$TAG"
 
-                    kubectl rollout status "deployment/$K8S_DEPLOYMENT" \
-                      -n "$K8S_NAMESPACE" \
-                      --timeout=180s
+                    docker stop "$CONTAINER_NAME" 2>/dev/null || true
+                    docker rm "$CONTAINER_NAME" 2>/dev/null || true
 
-                    echo "Deploiement OK : $IMAGE:$TAG"
+                    docker run -d \
+                      --name "$CONTAINER_NAME" \
+                      --restart unless-stopped \
+                      -p "${APP_PORT}:8081" \
+                      "$IMAGE:$TAG"
+
+                    echo "Conteneur demarre : $CONTAINER_NAME ($IMAGE:$TAG) sur le port $APP_PORT"
+                    docker ps --filter "name=$CONTAINER_NAME"
                 '''
             }
         }
@@ -153,7 +153,7 @@ pipeline {
             echo "Pipeline termine — build #${env.BUILD_NUMBER}"
         }
         success {
-            echo "Succes : image $IMAGE:${env.BUILD_NUMBER} deployee"
+            echo "Succes : image $IMAGE:${env.BUILD_NUMBER} deployee (conteneur $CONTAINER_NAME)"
         }
         failure {
             echo "Echec du pipeline — verifier les logs des stages ci-dessus"

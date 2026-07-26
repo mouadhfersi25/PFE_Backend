@@ -1,0 +1,13 @@
+.git
+.idea
+*.iml
+target/*
+!target/*.jar
+src
+scripts
+node_modules
+*.md
+.mvn
+mvnw
+mvnw.cmd
+Jenkinsfile

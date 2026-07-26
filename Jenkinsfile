@@ -36,7 +36,7 @@ pipeline {
             steps {
                 sh '''
                     set -eu
-                    java -version
+                    . scripts/ensure-java-home.sh
                     chmod +x mvnw
                     ./mvnw -B -q clean package -DskipTests
                     ls -la target/*.jar
@@ -49,6 +49,7 @@ pipeline {
             steps {
                 sh '''
                     set -eu
+                    . scripts/ensure-java-home.sh
                     ./mvnw -B -q test
                     test -f target/site/jacoco/jacoco.xml
                     echo "Rapport Jacoco : target/site/jacoco/jacoco.xml"
@@ -62,6 +63,7 @@ pipeline {
                                  credentialsId: 'sonarqube-token') {
                     sh '''
                         set -eu
+                        . scripts/ensure-java-home.sh
                         ./mvnw -B -q \
                           org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
                           -Dsonar.projectKey=${SONAR_PROJECT_KEY} \

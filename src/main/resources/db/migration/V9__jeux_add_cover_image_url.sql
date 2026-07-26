@@ -1,0 +1,3 @@
+ALTER TABLE jeux
+ADD COLUMN IF NOT EXISTS cover_image_url TEXT;
+

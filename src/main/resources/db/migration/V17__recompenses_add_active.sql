@@ -1,0 +1,9 @@
+ALTER TABLE recompenses
+    ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+
+UPDATE recompenses
+SET active = TRUE
+WHERE active IS NULL;
+
+ALTER TABLE recompenses
+    ALTER COLUMN active SET NOT NULL;

@@ -1,0 +1,2 @@
+ALTER TABLE jeux
+    ADD COLUMN IF NOT EXISTS last_content_update_at TIMESTAMP NULL;

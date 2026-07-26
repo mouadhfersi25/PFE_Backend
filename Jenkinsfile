@@ -5,7 +5,7 @@ pipeline {
         // Doit correspondre au nom dans Manage Jenkins > Tools > Installations JDK
         jdk 'JAVA_HOME'
         // Node pour scripts/wait-quality-gate.js
-        nodejs 'NodeJS'
+        nodejs 'Nodejs'
     }
 
     options {

@@ -125,6 +125,14 @@ function sleep(ms) {
   const qgStatus = qg?.projectStatus?.status;
   console.log(`Quality Gate = ${qgStatus}`);
 
+  const conditions = qg?.projectStatus?.conditions || [];
+  for (const c of conditions) {
+    const marker = c.status === 'OK' ? 'OK   ' : 'ECHEC';
+    console.log(
+      `  [${marker}] ${c.metricKey} : valeur=${c.actualValue} ${c.comparator} seuil=${c.errorThreshold}`
+    );
+  }
+
   if (qgStatus !== 'OK') {
     fail(`Quality Gate non OK : ${qgStatus}`);
   }

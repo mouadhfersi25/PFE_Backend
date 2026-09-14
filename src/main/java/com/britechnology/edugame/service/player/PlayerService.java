@@ -95,20 +95,35 @@ public class PlayerService {
 
     public RealtimeRoomStateDTO createRealtimeRoom(Authentication authentication, CreateRoomRequest request) {
         if (request == null || request.getGameId() == null) {
-            throw ApiException.badRequest("gameId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         return realtimeRoomService.createRoom(authentication.getName(), request.getGameId());
     }
 
     public RealtimeRoomStateDTO joinRealtimeRoom(Authentication authentication, JoinRoomRequest request) {
         if (request == null || request.getRoomCode() == null || request.getRoomCode().isBlank()) {
-            throw ApiException.badRequest("roomCode est requis");
+            throw ApiException.badRequest("Le code de salle est requis");
         }
         return realtimeRoomService.joinRoom(authentication.getName(), request.getRoomCode());
     }
 
     public RealtimeRoomStateDTO getRealtimeRoom(String roomCode) {
         return realtimeRoomService.getRoom(roomCode);
+    }
+
+    /** Un joueur quitte une salle — symétrique de {@link #joinRealtimeRoom}. */
+    public void leaveRealtimeRoom(Authentication authentication, String roomCode) {
+        realtimeRoomService.leaveRoom(authentication.getName(), roomCode);
+    }
+
+    /** Abandon en cours de partie : le joueur est marqué "abandonné" plutôt que retiré. */
+    public void forfeitRealtimeRoom(Authentication authentication, String roomCode) {
+        realtimeRoomService.forfeit(authentication.getName(), roomCode);
+    }
+
+    /** Salles en ligne ouvertes que n'importe quel joueur connecté peut voir et rejoindre. */
+    public java.util.List<RealtimeRoomStateDTO> listAvailableRealtimeRooms(Long gameId) {
+        return realtimeRoomService.listAvailableRooms(gameId);
     }
 
     public RealtimeRoomStateDTO setRealtimeRoomReady(Authentication authentication, String roomCode, boolean ready) {

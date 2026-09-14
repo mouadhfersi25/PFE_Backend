@@ -26,6 +26,7 @@ public class EducatorVoiceSeriesService {
     private final VoiceAttemptRepository voiceAttemptRepository;
     private final UserRepository userRepository;
 
+    @Transactional(readOnly = true)
     public List<VoiceSeriesDTO> listByEducator(String educatorEmail) {
         User educateur = resolveEducator(educatorEmail);
         return voiceSeriesRepository.findByEducateurIdOrderByUpdatedAtDesc(educateur.getId()).stream()
@@ -33,6 +34,7 @@ public class EducatorVoiceSeriesService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public VoiceSeriesDTO findById(Long id, String educatorEmail) {
         VoiceSeries series = loadOwnedSeries(id, educatorEmail);
         return toDetailDto(series);
@@ -59,7 +61,7 @@ public class EducatorVoiceSeriesService {
     @Transactional
     public VoiceSeriesDTO update(Long id, UpdateVoiceSeriesRequest request, String educatorEmail) {
         VoiceSeries series = loadOwnedSeries(id, educatorEmail);
-        VoiceContentValidator.requireDraft(series);
+        VoiceContentValidator.requireEditable(series);
         if (request.getTitre() != null) {
             if (request.getTitre().isBlank()) {
                 throw ApiException.badRequest("Le titre ne peut pas être vide");
@@ -107,6 +109,21 @@ public class EducatorVoiceSeriesService {
     public VoiceSeriesDTO archive(Long id, String educatorEmail) {
         VoiceSeries series = loadOwnedSeries(id, educatorEmail);
         series.setEtat(EtatVoiceSeries.ARCHIVE);
+        series = voiceSeriesRepository.save(series);
+        return toDetailDto(series);
+    }
+
+    @Transactional
+    public VoiceSeriesDTO unarchive(Long id, String educatorEmail) {
+        VoiceSeries series = loadOwnedSeries(id, educatorEmail);
+        if (series.getEtat() != EtatVoiceSeries.ARCHIVE) {
+            throw ApiException.badRequest("Cette série n'est pas archivée");
+        }
+        if (series.getPublishedAt() != null) {
+            series.setEtat(EtatVoiceSeries.PUBLIE);
+        } else {
+            series.setEtat(EtatVoiceSeries.BROUILLON);
+        }
         series = voiceSeriesRepository.save(series);
         return toDetailDto(series);
     }

@@ -1,7 +1,7 @@
 package com.britechnology.edugame.dto.game;
 
+import com.britechnology.edugame.entity.Difficulte;
 import com.britechnology.edugame.entity.ModeJeu;
-import com.britechnology.edugame.entity.QuizPlayMode;
 import com.britechnology.edugame.entity.QuizVariant;
 import com.britechnology.edugame.entity.TypeJeu;
 import jakarta.validation.constraints.*;
@@ -20,9 +20,7 @@ public class CreateGameRequest {
     @Size(max = 5000)
     private String description;
 
-    @Min(0)
-    @Max(10)
-    private Integer difficulte;
+    private Difficulte difficulte;
 
     @Min(0)
     private Integer ageMin;
@@ -41,16 +39,10 @@ public class CreateGameRequest {
     @Max(999)
     private Integer dureeMinutes;
 
-    @Size(max = 20)
-    private String icone;
-
     private String coverImageUrl;
 
     /** Par défaut true si non fourni. */
     private Boolean actif = true;
-
-    /** Mode de partie quiz : CLASSIC ou BLITZ_60S (ignoré si typeJeu != QUIZ). */
-    private QuizPlayMode quizPlayMode;
 
     /** Variante pédagogique quiz (ignorée si typeJeu != QUIZ). */
     private QuizVariant quizVariant;

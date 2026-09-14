@@ -1,7 +1,6 @@
 package com.britechnology.edugame.service.voice;
 
 import com.britechnology.edugame.entity.VoiceTolerance;
-import com.britechnology.edugame.repository.badge.NiveauRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

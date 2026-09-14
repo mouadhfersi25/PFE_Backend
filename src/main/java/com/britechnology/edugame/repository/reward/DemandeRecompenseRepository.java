@@ -10,4 +10,5 @@ public interface DemandeRecompenseRepository extends JpaRepository<DemandeRecomp
     List<DemandeRecompense> findByUtilisateurIdOrderByDateDemandeDesc(Long utilisateurId);
     Optional<DemandeRecompense> findFirstByUtilisateurIdAndRecompenseIdOrderByDateDemandeDesc(Long utilisateurId, Long recompenseId);
     List<DemandeRecompense> findAllByOrderByDateDemandeDescIdDesc();
+    long countByStatutIgnoreCase(String statut);
 }

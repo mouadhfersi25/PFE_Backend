@@ -19,7 +19,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
-        return ResponseEntity.ok(Map.of("message", "User registered successfully. Please verify your email."));
+        return ResponseEntity.ok(Map.of("message", "Inscription réussie. Veuillez vérifier votre e-mail."));
     }
 
     @GetMapping("/verify")
@@ -37,13 +37,13 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password reset email sent successfully"));
+        return ResponseEntity.ok(Map.of("message", "E-mail de réinitialisation du mot de passe envoyé avec succès"));
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+        return ResponseEntity.ok(Map.of("message", "Mot de passe réinitialisé avec succès"));
     }
 
     @PostMapping("/logout")

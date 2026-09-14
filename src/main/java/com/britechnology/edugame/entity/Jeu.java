@@ -24,7 +24,9 @@ public class Jeu {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    private Integer difficulte;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "difficulte", length = 20)
+    private Difficulte difficulte;
 
     @Column(name = "age_min")
     private Integer ageMin;
@@ -44,11 +46,17 @@ public class Jeu {
     @Builder.Default
     private boolean actif = false;
 
+    /**
+     * Vrai lorsque l'éducateur a corrigé un jeu désactivé (suite à signalement) et a demandé
+     * sa réactivation ; l'admin doit alors accepter (actif=true) ou refuser (reste désactivé).
+     * Tant que ce flag est vrai, le jeu redevient non modifiable (en attente de décision admin).
+     */
+    @Column(name = "reactivation_pending")
+    @Builder.Default
+    private boolean reactivationPending = false;
+
     @Column(name = "duree_minutes")
     private Integer dureeMinutes;
-
-    @Column(name = "icone", length = 20)
-    private String icone;
 
     @Column(name = "cover_image_url", columnDefinition = "TEXT")
     private String coverImageUrl;
@@ -75,12 +83,6 @@ public class Jeu {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_educateur")
     private User educateur;
-
-    /** Mode de partie pour les jeux QUIZ (classique ou blitz 60 s). */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "quiz_play_mode", nullable = false, length = 20)
-    @Builder.Default
-    private QuizPlayMode quizPlayMode = QuizPlayMode.CLASSIC;
 
     /** Variante pédagogique pour les jeux QUIZ (une variante par jeu). */
     @Enumerated(EnumType.STRING)

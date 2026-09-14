@@ -31,5 +31,9 @@ public class LinkedChildProfileDTO {
     private Integer skillLogic;
     private Integer skillMemory;
     private Integer skillReflex;
+    /** Temps de jeu cumulé (sessions terminées) sur les 7 derniers jours, en minutes. */
+    private Integer weeklyPlaytimeMinutes;
+    /** Taux de réussite moyen (accuracyPercent) toutes sessions terminées confondues. */
+    private Integer averageSuccessRate;
     private boolean onboardingCompleted;
 }

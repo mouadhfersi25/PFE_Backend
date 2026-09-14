@@ -8,7 +8,6 @@ import com.britechnology.edugame.entity.TypeConditionBadge;
 import com.britechnology.edugame.exception.ApiException;
 import com.britechnology.edugame.repository.badge.BadgeRepository;
 import com.britechnology.edugame.repository.badge.BadgeUtilisateurRepository;
-import com.britechnology.edugame.repository.badge.NiveauRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +21,6 @@ public class AdminBadgeService {
 
     private final BadgeRepository badgeRepository;
     private final BadgeUtilisateurRepository badgeUtilisateurRepository;
-    private final NiveauRepository niveauRepository;
 
     /**
      * Liste tous les badges (ordre par nom).
@@ -76,17 +74,13 @@ public class AdminBadgeService {
     }
 
     /**
-     * Supprime un badge. Supprime d'abord les liaisons badges_utilisateur et décroche les niveaux.
+     * Supprime un badge. Supprime d'abord les liaisons badges_utilisateur.
      */
     @Transactional
     public void deleteBadge(Long id) {
         Badge badge = badgeRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Badge introuvable"));
         badgeUtilisateurRepository.deleteByBadgeId(id);
-        niveauRepository.findByBadgeId(id).forEach(n -> {
-            n.setBadge(null);
-            niveauRepository.save(n);
-        });
         badgeRepository.delete(badge);
     }
 

@@ -38,9 +38,10 @@ public class Recompense {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
-    @ManyToOne
+    /** Le sponsor (compte User avec Role.SPONSOR) propriétaire de cette récompense. */
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_sponsor")
-    private Sponsor sponsor;
+    private User sponsor;
 
     @PrePersist
     protected void onCreate() {

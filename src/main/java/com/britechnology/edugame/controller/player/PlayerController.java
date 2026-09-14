@@ -42,13 +42,14 @@ import com.britechnology.edugame.repository.game.CarteMemoireRepository;
 import com.britechnology.edugame.repository.game.JeuRepository;
 import com.britechnology.edugame.repository.game.PuzzleLogiqueRepository;
 import com.britechnology.edugame.repository.game.QuestionRepository;
-import com.britechnology.edugame.repository.badge.NiveauRepository;
 import com.britechnology.edugame.repository.user.UserRepository;
 import com.britechnology.edugame.service.educator.EducatorReflexService;
 import com.britechnology.edugame.service.player.ParentLinkageService;
 import com.britechnology.edugame.service.player.PlayerService;
+import com.britechnology.edugame.service.player.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,6 +72,7 @@ public class PlayerController {
 
     private final UserRepository userRepository;
     private final PlayerService playerService;
+    private final UserService userService;
     private final ParentLinkageService parentLinkageService;
     private final EducatorReflexService educatorReflexService;
     private final JeuRepository jeuRepository;
@@ -78,54 +80,24 @@ public class PlayerController {
     private final CarteMemoireRepository carteMemoireRepository;
     private final PuzzleLogiqueRepository puzzleLogiqueRepository;
     private final ObjectMapper objectMapper;
-    private final NiveauRepository niveauRepository;
 
     @GetMapping("/me")
     public UserDTO getMe(Authentication authentication) {
-
-        String email = authentication.getName();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
-
-        return UserDTO.builder()
-                .id(user.getId())
-                .nom(user.getNom())
-                .prenom(user.getPrenom())
-                .email(user.getEmail())
-                .password(null)
-                .telephone(user.getTelephone())
-                .avatarUrl(AvatarPolicy.publicAvatarUrl(user))
-                .role(user.getRole().name())
-                .etatCompte(user.getEtatCompte())
-                .enabled(user.isEnabled())
-                .dateDeNaissance(user.getDateDeNaissance())
-                .niveau(user.getNiveau())
-                .scoreTotal(user.getScoreTotal())
-                .pointsExperience(user.getPointsExperience())
-                .xpToNextLevel(xpToNextLevel(user.getNiveau() != null ? Math.max(1, user.getNiveau()) : 1))
-                .currentStreakDays(user.getCurrentStreakDays())
-                .bestStreakDays(user.getBestStreakDays())
-                .lastStreakDate(user.getLastStreakDate())
-                .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
-                .regionNom(user.getRegion() != null ? user.getRegion().getNom() : null)
-                .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
-                .paysNom(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getNom() : null)
-                .onboardingCompleted(user.isOnboardingCompleted())
-                .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
-                .resetToken(user.getResetToken())
-                .resetTokenExpiry(user.getResetTokenExpiry())
-                .tokenVerification(user.getTokenVerification())
-                .dateExpirationToken(user.getDateExpirationToken())
-                .dateDerniereConnexion(user.getDateDerniereConnexion())
-                .dateCreation(user.getDateCreation())
-                .idParent(user.getParent() != null ? user.getParent().getId() : null)
-                .build();
+        return userService.getMe(authentication);
     }
 
     @GetMapping("/me/linked-children")
     public ResponseEntity<java.util.List<LinkedChildProfileDTO>> getLinkedChildren(Authentication authentication) {
         return ResponseEntity.ok(parentLinkageService.getLinkedChildren(authentication));
+    }
+
+    @PostMapping("/me/linked-children")
+    public ResponseEntity<LinkedChildProfileDTO> createLinkedChild(
+            Authentication authentication,
+            @jakarta.validation.Valid @RequestBody com.britechnology.edugame.dto.player.CreateChildRequest request
+    ) {
+        LinkedChildProfileDTO created = parentLinkageService.createChild(authentication, request);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/me/linked-children/{childId}/history")
@@ -319,6 +291,31 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.joinRealtimeRoom(authentication, request));
     }
 
+    @PostMapping("/rooms/{roomCode}/leave")
+    public ResponseEntity<Void> leaveRoom(
+            Authentication authentication,
+            @PathVariable String roomCode
+    ) {
+        playerService.leaveRealtimeRoom(authentication, roomCode);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/rooms/{roomCode}/forfeit")
+    public ResponseEntity<Void> forfeitRoom(
+            Authentication authentication,
+            @PathVariable String roomCode
+    ) {
+        playerService.forfeitRealtimeRoom(authentication, roomCode);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/rooms/available")
+    public ResponseEntity<java.util.List<RealtimeRoomStateDTO>> listAvailableRooms(
+            @RequestParam(required = false) Long gameId
+    ) {
+        return ResponseEntity.ok(playerService.listAvailableRealtimeRooms(gameId));
+    }
+
     @GetMapping("/rooms/{roomCode}")
     public ResponseEntity<RealtimeRoomStateDTO> getRoom(
             @PathVariable String roomCode
@@ -365,11 +362,9 @@ public class PlayerController {
                 .ageMax(jeu.getAgeMax())
                 .typeJeu(jeu.getTypeJeu())
                 .modeJeu(jeu.getModeJeu())
-                .quizPlayMode(jeu.getQuizPlayMode())
                 .quizVariant(jeu.getQuizVariant())
                 .actif(jeu.isActif())
                 .dureeMinutes(jeu.getDureeMinutes())
-                .icone(jeu.getIcone())
                 .coverImageUrl(jeu.getCoverImageUrl())
                 .etat(jeu.getEtat())
                 .dateCreation(jeu.getDateCreation())
@@ -430,8 +425,6 @@ public class PlayerController {
     }
 
     private int xpToNextLevel(int level) {
-        return niveauRepository.findByNiveau(level)
-                .map(cfg -> Math.max(1, cfg.getPointMin() != null ? cfg.getPointMin() : 0))
-                .orElse(Math.max(250, (level * 150) + (level * level * 55)));
+        return Math.max(250, (level * 150) + (level * level * 55));
     }
 }

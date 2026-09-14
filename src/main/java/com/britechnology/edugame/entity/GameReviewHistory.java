@@ -27,7 +27,7 @@ public class GameReviewHistory {
     private User admin;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "action", nullable = false, length = 20)
+    @Column(name = "action", nullable = false, length = 40)
     private GameReviewAction action;
 
     @Column(name = "motif_refus", columnDefinition = "TEXT")

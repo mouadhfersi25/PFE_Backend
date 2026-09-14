@@ -1,11 +1,14 @@
 package com.britechnology.edugame.service.player;
 
+import com.britechnology.edugame.dto.player.CreateChildRequest;
 import com.britechnology.edugame.dto.player.LinkedChildProfileDTO;
 import com.britechnology.edugame.dto.player.PlayerBadgeOverviewItemDTO;
 import com.britechnology.edugame.dto.player.PlayerHistorySessionDTO;
 import com.britechnology.edugame.entity.Badge;
 import com.britechnology.edugame.entity.BadgeUtilisateur;
+import com.britechnology.edugame.entity.EtatCompte;
 import com.britechnology.edugame.entity.EtatSession;
+import com.britechnology.edugame.entity.Genre;
 import com.britechnology.edugame.entity.TypeJeu;
 import com.britechnology.edugame.entity.TypeConditionBadge;
 import com.britechnology.edugame.entity.Role;
@@ -14,14 +17,18 @@ import com.britechnology.edugame.entity.User;
 import com.britechnology.edugame.exception.ApiException;
 import com.britechnology.edugame.repository.badge.BadgeRepository;
 import com.britechnology.edugame.repository.badge.BadgeUtilisateurRepository;
-import com.britechnology.edugame.repository.badge.NiveauRepository;
 import com.britechnology.edugame.repository.game.SessionJeuRepository;
 import com.britechnology.edugame.repository.user.UserRepository;
+import com.britechnology.edugame.service.auth.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +38,11 @@ import java.util.Map;
 public class ParentLinkageService {
 
     private final UserRepository userRepository;
-    private final NiveauRepository niveauRepository;
     private final SessionJeuRepository sessionJeuRepository;
     private final BadgeRepository badgeRepository;
     private final BadgeUtilisateurRepository badgeUtilisateurRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @Transactional(readOnly = true)
     public List<LinkedChildProfileDTO> getLinkedChildren(Authentication authentication) {
@@ -49,6 +57,58 @@ public class ParentLinkageService {
         return userRepository.findByParentIdOrderByPrenomAscNomAsc(parent.getId()).stream()
                 .map(this::toLinkedChild)
                 .toList();
+    }
+
+    @Transactional
+    public LinkedChildProfileDTO createChild(Authentication authentication, CreateChildRequest request) {
+        User parent = requireParent(authentication);
+        if (request == null) {
+            throw ApiException.badRequest("Données manquantes");
+        }
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        if (email.isEmpty()) {
+            throw ApiException.badRequest("L'e-mail est requis");
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw ApiException.badRequest("Cet e-mail est déjà utilisé");
+        }
+        int age = Period.between(request.getDateDeNaissance(), LocalDate.now()).getYears();
+        if (age < 7) {
+            throw ApiException.badRequest("L'âge minimum du joueur est de 7 ans");
+        }
+        if (age > 18) {
+            throw ApiException.badRequest("L'âge maximum du joueur est de 18 ans");
+        }
+
+        User child = User.builder()
+                .nom(request.getNom().trim())
+                .prenom(request.getPrenom().trim())
+                .email(email)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .dateDeNaissance(request.getDateDeNaissance())
+                .telephone(request.getTelephone())
+                .genre(Genre.parse(request.getGenre()))
+                .role(Role.JOUEUR)
+                .etatCompte(EtatCompte.ACTIF)
+                .enabled(true)
+                .parent(parent)
+                .niveau(1)
+                .scoreTotal(0)
+                .pointsExperience(0)
+                .currentStreakDays(0)
+                .bestStreakDays(0)
+                .onboardingCompleted(false)
+                .build();
+        child = userRepository.save(child);
+
+        String parentDisplayName = ((parent.getPrenom() != null ? parent.getPrenom() : "") + " " +
+                (parent.getNom() != null ? parent.getNom() : "")).trim();
+        if (parentDisplayName.isEmpty()) {
+            parentDisplayName = parent.getEmail();
+        }
+        emailService.sendChildAccountCreatedEmail(email, request.getPrenom(), request.getPassword(), parentDisplayName);
+
+        return toLinkedChild(child);
     }
 
     @Transactional(readOnly = true)
@@ -104,8 +164,21 @@ public class ParentLinkageService {
                 .skillLogic(averageAccuracy(child.getId(), TypeJeu.LOGIQUE))
                 .skillMemory(averageAccuracy(child.getId(), TypeJeu.MEMOIRE))
                 .skillReflex(averageAccuracy(child.getId(), TypeJeu.REFLEXE))
+                .weeklyPlaytimeMinutes(weeklyPlaytimeMinutes(child.getId()))
+                .averageSuccessRate(overallAverageAccuracy(child.getId()))
                 .onboardingCompleted(child.isOnboardingCompleted())
                 .build();
+    }
+
+    private int weeklyPlaytimeMinutes(Long childId) {
+        Integer weeklySeconds = sessionJeuRepository.sumDurationSecondsSince(childId, LocalDateTime.now().minusDays(7));
+        return Math.max(0, (weeklySeconds != null ? weeklySeconds : 0) / 60);
+    }
+
+    private int overallAverageAccuracy(Long childId) {
+        Double avg = sessionJeuRepository.averageAccuracyByUser(childId);
+        if (avg == null) return 0;
+        return Math.max(0, Math.min(100, (int) Math.round(avg)));
     }
 
     private int averageAccuracy(Long childId, TypeJeu typeJeu) {
@@ -116,23 +189,26 @@ public class ParentLinkageService {
     }
 
     private int xpToNextLevel(int level) {
-        return niveauRepository.findByNiveau(level)
-                .map(cfg -> Math.max(1, cfg.getPointMin() != null ? cfg.getPointMin() : 0))
-                .orElse(Math.max(250, (level * 150) + (level * level * 55)));
+        return Math.max(250, (level * 150) + (level * level * 55));
     }
 
-    private User resolveLinkedChild(Authentication authentication, Long childId) {
+    private User requireParent(Authentication authentication) {
         if (authentication == null || authentication.getName() == null) {
             throw ApiException.unauthorized("Non authentifié");
-        }
-        if (childId == null) {
-            throw ApiException.badRequest("childId est requis");
         }
         User parent = userRepository.findByEmail(authentication.getName().trim())
                 .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
         if (parent.getRole() != Role.PARENT) {
             throw ApiException.forbidden("Réservé aux comptes parent");
         }
+        return parent;
+    }
+
+    private User resolveLinkedChild(Authentication authentication, Long childId) {
+        if (childId == null) {
+            throw ApiException.badRequest("L'identifiant de l'enfant est requis");
+        }
+        User parent = requireParent(authentication);
         User child = userRepository.findById(childId)
                 .orElseThrow(() -> ApiException.notFound("Enfant introuvable"));
         if (child.getParent() == null || !parent.getId().equals(child.getParent().getId())) {

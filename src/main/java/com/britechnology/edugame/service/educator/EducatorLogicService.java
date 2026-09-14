@@ -37,7 +37,7 @@ public class EducatorLogicService {
     @Transactional
     public LogicPuzzleDTO create(CreateLogicPuzzleRequest request) {
         if (request == null || request.getJeuId() == null) {
-            throw ApiException.badRequest("jeuId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         Jeu jeu = validateJeuType(request.getJeuId(), TypeJeu.LOGIQUE);
         EducatorGameEditPolicy.requireDraft(jeu);

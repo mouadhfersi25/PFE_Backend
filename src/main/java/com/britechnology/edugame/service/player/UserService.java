@@ -33,7 +33,6 @@ import com.britechnology.edugame.entity.TypeConditionBadge;
 import com.britechnology.edugame.entity.User;
 import com.britechnology.edugame.exception.ApiException;
 import com.britechnology.edugame.util.AvatarPolicy;
-import com.britechnology.edugame.repository.badge.NiveauRepository;
 import com.britechnology.edugame.repository.badge.BadgeRepository;
 import com.britechnology.edugame.repository.badge.BadgeUtilisateurRepository;
 import com.britechnology.edugame.repository.game.JeuRepository;
@@ -43,6 +42,7 @@ import com.britechnology.edugame.repository.geo.RegionRepository;
 import com.britechnology.edugame.repository.reward.DemandeRecompenseRepository;
 import com.britechnology.edugame.repository.sponsor.RecompenseRepository;
 import com.britechnology.edugame.repository.user.UserRepository;
+import com.britechnology.edugame.repository.voice.SessionOralRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -52,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,7 +72,6 @@ public class UserService {
     private final SessionJeuRepository sessionJeuRepository;
     private final PaysRepository paysRepository;
     private final RegionRepository regionRepository;
-    private final NiveauRepository niveauRepository;
     private final BadgeRepository badgeRepository;
     private final BadgeUtilisateurRepository badgeUtilisateurRepository;
     private final RecompenseRepository recompenseRepository;
@@ -81,6 +81,19 @@ public class UserService {
     private final ProgressionGuardrailService progressionGuardrailService;
     private final SessionLaunchModeValidatorService sessionLaunchModeValidatorService;
     private final RealtimeRoomService realtimeRoomService;
+    private final SessionOralRepository sessionOralRepository;
+
+    @Transactional(readOnly = true)
+    public UserDTO getMe(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw ApiException.unauthorized("Non authentifié");
+        }
+        String email = authentication.getName().trim();
+        User user = userRepository.findByEmailWithProfile(email)
+                .or(() -> userRepository.findByEmail(email))
+                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+        return buildUserDTO(user);
+    }
 
     public UserDTO updateProfile(Authentication authentication, UpdateProfileRequest request) {
 
@@ -125,7 +138,7 @@ public class UserService {
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
                 .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
                 .onboardingCompleted(user.isOnboardingCompleted())
-                .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
+                .genre(user.getGenre() != null ? user.getGenre().name() : null)
                 .resetToken(user.getResetToken())
                 .resetTokenExpiry(user.getResetTokenExpiry())
                 .tokenVerification(user.getTokenVerification())
@@ -206,7 +219,7 @@ public class UserService {
     @Transactional
     public CreateGameSessionResponse createGameSession(Authentication authentication, CreateGameSessionRequest request) {
         if (request == null || request.getGameId() == null) {
-            throw ApiException.badRequest("gameId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
@@ -252,7 +265,7 @@ public class UserService {
                     etat,
                     request,
                     requestedDuration,
-                    jeu.getDifficulte()
+                    jeu.getDifficulte() != null ? jeu.getDifficulte().getWeight() : null
             );
         } catch (IllegalArgumentException ex) {
             log.warn("Session rejected: userId={} gameId={} reason={}", user.getId(), request.getGameId(), ex.getMessage());
@@ -267,7 +280,7 @@ public class UserService {
         SmartAdjustmentService.AdjustmentResult adjustmentResult = smartAdjustmentService.computeBoundedAdjustment(
                 user.getId(),
                 jeu.getTypeJeu(),
-                jeu.getDifficulte(),
+                jeu.getDifficulte() != null ? jeu.getDifficulte().getWeight() : null,
                 baseScore,
                 request,
                 recentSessions
@@ -687,7 +700,6 @@ public class UserService {
             throw ApiException.badRequest("Seuls les joueurs peuvent consulter les récompenses");
         }
 
-        int totalScore = user.getScoreTotal() != null ? Math.max(0, user.getScoreTotal()) : 0;
         Map<Long, DemandeRecompense> requestByRewardId = demandeRecompenseRepository
                 .findByUtilisateurIdOrderByDateDemandeDesc(user.getId())
                 .stream()
@@ -700,7 +712,11 @@ public class UserService {
 
         List<PlayerRewardOverviewItemDTO> rows = recompenseRepository.findAllByOrderByIdDesc().stream()
                 .filter(r -> !Boolean.FALSE.equals(r.getActive()))
-                .map(reward -> toPlayerRewardOverviewItemDTO(reward, requestByRewardId.get(reward.getId()), totalScore))
+                .map(reward -> toPlayerRewardOverviewItemDTO(
+                        reward,
+                        requestByRewardId.get(reward.getId()),
+                        scoreEarnedSinceRewardCreation(user.getId(), reward)
+                ))
                 .toList();
 
         int claimableCount = (int) rows.stream().filter(PlayerRewardOverviewItemDTO::isClaimable).count();
@@ -717,7 +733,7 @@ public class UserService {
     @Transactional
     public PlayerRewardOverviewItemDTO claimReward(Authentication authentication, Long rewardId) {
         if (rewardId == null) {
-            throw ApiException.badRequest("rewardId est requis");
+            throw ApiException.badRequest("L'identifiant de la récompense est requis");
         }
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
@@ -732,23 +748,20 @@ public class UserService {
             throw ApiException.badRequest("Cette récompense n'est plus disponible");
         }
 
+        int scoreSinceReward = scoreEarnedSinceRewardCreation(user.getId(), reward);
+
         DemandeRecompense existing = demandeRecompenseRepository
                 .findFirstByUtilisateurIdAndRecompenseIdOrderByDateDemandeDesc(user.getId(), rewardId)
                 .orElse(null);
         if (existing != null && !"REJECTED".equalsIgnoreCase(existing.getStatut())) {
-            return toPlayerRewardOverviewItemDTO(
-                    reward,
-                    existing,
-                    user.getScoreTotal() != null ? Math.max(0, user.getScoreTotal()) : 0
-            );
+            return toPlayerRewardOverviewItemDTO(reward, existing, scoreSinceReward);
         }
 
-        int totalScore = user.getScoreTotal() != null ? Math.max(0, user.getScoreTotal()) : 0;
         int requiredScore = reward.getScoreMin() != null ? Math.max(0, reward.getScoreMin()) : 0;
         if (requiredScore <= 0) {
             throw ApiException.badRequest("Condition de déblocage non configurée pour cette récompense");
         }
-        if (totalScore < requiredScore) {
+        if (scoreSinceReward < requiredScore) {
             throw ApiException.badRequest("Score insuffisant pour débloquer cette récompense");
         }
 
@@ -759,13 +772,13 @@ public class UserService {
                 .dateDemande(LocalDate.now())
                 .build();
         DemandeRecompense saved = demandeRecompenseRepository.save(request);
-        return toPlayerRewardOverviewItemDTO(reward, saved, totalScore);
+        return toPlayerRewardOverviewItemDTO(reward, saved, scoreSinceReward);
     }
 
     @Transactional
     public PlayerBadgeOverviewItemDTO claimBadge(Authentication authentication, Long badgeId) {
         if (badgeId == null) {
-            throw ApiException.badRequest("badgeId est requis");
+            throw ApiException.badRequest("L'identifiant du badge est requis");
         }
 
         String email = authentication.getName();
@@ -898,17 +911,40 @@ public class UserService {
         };
     }
 
+    private static final DateTimeFormatter REWARD_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    /**
+     * Score gagné par le joueur depuis la création de la récompense (et non son score total à
+     * vie) : évite qu'un joueur ayant déjà un score élevé rende une nouvelle récompense
+     * immédiatement réclamable avec des points gagnés bien avant qu'elle n'existe.
+     * Cumule les jeux (Quiz/Mémoire/Logique/Réflexe) et l'atelier oral, les deux alimentant le
+     * même score total (`user.scoreTotal`).
+     */
+    private int scoreEarnedSinceRewardCreation(Long userId, Recompense reward) {
+        LocalDate createdOn = reward.getDateCreation() != null ? reward.getDateCreation() : LocalDate.now();
+        LocalDateTime since = createdOn.atStartOfDay();
+        Integer gamesSum = sessionJeuRepository.sumScoreGlobalByUserSince(userId, since);
+        Integer oralSum = sessionOralRepository.sumScoreFinalByUserSince(userId, since);
+        int total = (gamesSum != null ? gamesSum : 0) + (oralSum != null ? oralSum : 0);
+        return Math.max(0, total);
+    }
+
     private PlayerRewardOverviewItemDTO toPlayerRewardOverviewItemDTO(
             Recompense reward,
             DemandeRecompense request,
-            int totalScore
+            int scoreSinceRewardCreation
     ) {
         int requiredScore = reward.getScoreMin() != null ? Math.max(0, reward.getScoreMin()) : 0;
         boolean conditionConfigured = requiredScore > 0;
-        boolean scoreReached = conditionConfigured && totalScore >= requiredScore;
+        boolean scoreReached = conditionConfigured && scoreSinceRewardCreation >= requiredScore;
         boolean hasActiveRequest = request != null && request.getStatut() != null && !"REJECTED".equalsIgnoreCase(request.getStatut());
         boolean claimed = request != null && request.getStatut() != null
                 && "APPROVED".equalsIgnoreCase(request.getStatut());
+        String sinceLabel = reward.getDateCreation() != null ? reward.getDateCreation().format(REWARD_DATE_FORMAT) : null;
+        String unlockCondition = !conditionConfigured
+                ? "Condition non configurée"
+                : "Score gagné depuis le " + (sinceLabel != null ? sinceLabel : "lancement") + " >= " + requiredScore
+                    + " (" + scoreSinceRewardCreation + "/" + requiredScore + ")";
         return PlayerRewardOverviewItemDTO.builder()
                 .id(reward.getId())
                 .claimId(request != null ? request.getId() : null)
@@ -916,7 +952,7 @@ public class UserService {
                 .description(reward.getDescription())
                 .typeRecompense(reward.getTypeRecompense() != null ? reward.getTypeRecompense().name() : "AUTRE")
                 .scoreMin(requiredScore)
-                .unlockCondition(conditionConfigured ? ("Score total >= " + requiredScore) : "Condition non configurée")
+                .unlockCondition(unlockCondition)
                 .claimable(scoreReached && !hasActiveRequest)
                 .claimed(claimed)
                 .requestStatus(request != null ? request.getStatut() : null)
@@ -966,6 +1002,7 @@ public class UserService {
                 .email(user.getEmail())
                 .password(null)
                 .telephone(user.getTelephone())
+                .cin(user.getCin())
                 .avatarUrl(AvatarPolicy.publicAvatarUrl(user))
                 .role(user.getRole().name())
                 .etatCompte(user.getEtatCompte())
@@ -983,7 +1020,7 @@ public class UserService {
                 .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
                 .paysNom(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getNom() : null)
                 .onboardingCompleted(user.isOnboardingCompleted())
-                .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
+                .genre(user.getGenre() != null ? user.getGenre().name() : null)
                 .resetToken(user.getResetToken())
                 .resetTokenExpiry(user.getResetTokenExpiry())
                 .tokenVerification(user.getTokenVerification())
@@ -991,15 +1028,13 @@ public class UserService {
                 .dateDerniereConnexion(user.getDateDerniereConnexion())
                 .dateCreation(user.getDateCreation())
                 .idParent(user.getParent() != null ? user.getParent().getId() : null)
+                .parentPaysNom(user.getParent() != null ? user.getParent().getPaysPreference() : null)
                 .build();
     }
 
+    // Courbe XP fixe. Exemples : L1=250, L2=460, L3=720, L4=1030...
     private int xpToNextLevel(int level) {
-        return niveauRepository.findByNiveau(level)
-                .map(cfg -> Math.max(1, cfg.getPointMin() != null ? cfg.getPointMin() : 0))
-                // Fallback curve when DB levels are not configured yet.
-                // Examples: L1=250, L2=460, L3=720, L4=1030...
-                .orElse(Math.max(250, (level * 150) + (level * level * 55)));
+        return Math.max(250, (level * 150) + (level * level * 55));
     }
 
     private ProgressionResult applyProgression(

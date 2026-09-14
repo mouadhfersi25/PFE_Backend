@@ -20,9 +20,9 @@ public class AsyncConfig {
         executor.setMaxPoolSize(5);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("async-email-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(20);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.setAwaitTerminationSeconds(5);
         executor.setKeepAliveSeconds(60);
         executor.setAllowCoreThreadTimeOut(true);
         executor.setTaskDecorator(copyMdcTaskDecorator());

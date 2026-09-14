@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Tests de charge JMeter (résultats générés, pas le plan de test) ###
+performance-tests/results/
+performance-tests/*.jtl
+performance-tests/*.log

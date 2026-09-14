@@ -63,4 +63,9 @@ public class EducatorVoiceSeriesController {
     public ResponseEntity<VoiceSeriesDTO> archive(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(educatorVoiceSeriesService.archive(id, authentication.getName()));
     }
+
+    @PatchMapping("/{id}/unarchive")
+    public ResponseEntity<VoiceSeriesDTO> unarchive(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(educatorVoiceSeriesService.unarchive(id, authentication.getName()));
+    }
 }

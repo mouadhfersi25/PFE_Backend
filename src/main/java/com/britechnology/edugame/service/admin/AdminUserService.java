@@ -5,12 +5,14 @@ import com.britechnology.edugame.dto.player.UpdateRoleRequest;
 import com.britechnology.edugame.dto.player.UserDTO;
 import com.britechnology.edugame.entity.EtatCompte;
 import com.britechnology.edugame.entity.EtatSession;
+import com.britechnology.edugame.entity.Genre;
 import com.britechnology.edugame.entity.Role;
 import com.britechnology.edugame.entity.User;
 import com.britechnology.edugame.exception.ApiException;
 import com.britechnology.edugame.util.AvatarPolicy;
 import com.britechnology.edugame.repository.game.SessionJeuRepository;
 import com.britechnology.edugame.repository.user.UserRepository;
+import com.britechnology.edugame.service.auth.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ public class AdminUserService {
 
     private final UserRepository userRepository;
     private final SessionJeuRepository sessionJeuRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     /**
      * Récupère un utilisateur par id (réservé à l'admin). UserDTO = 100 % table users.
@@ -58,6 +62,11 @@ public class AdminUserService {
         user.setEtatCompte(EtatCompte.SUSPENDU);
         user.setEnabled(false);
         user = userRepository.save(user);
+
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            emailService.sendAccountSuspendedEmail(user.getEmail(), user.getPrenom());
+        }
+
         return toDTO(user);
     }
 
@@ -74,7 +83,7 @@ public class AdminUserService {
         return toDTO(user);
     }
 
-    private static final Set<Role> ROLES_ALLOWED_TO_ASSIGN = Set.of(Role.JOUEUR, Role.PARENT, Role.EDUCATEUR);
+    private static final Set<Role> ROLES_ALLOWED_TO_ASSIGN = Set.of(Role.JOUEUR, Role.PARENT, Role.EDUCATEUR, Role.SPONSOR);
 
     /**
      * Changer le rôle d'un utilisateur. Réservé à l'admin.
@@ -98,14 +107,69 @@ public class AdminUserService {
             throw ApiException.badRequest("Rôle invalide : " + roleStr);
         }
         if (!ROLES_ALLOWED_TO_ASSIGN.contains(newRole)) {
-            throw ApiException.badRequest("Seuls les rôles JOUEUR, PARENT et EDUCATEUR peuvent être attribués.");
+            throw ApiException.badRequest("Seuls les rôles JOUEUR, PARENT, EDUCATEUR et SPONSOR peuvent être attribués.");
         }
         target.setRole(newRole);
         if (newRole != Role.JOUEUR) {
+            // Gamification (niveau/score/XP/streaks) et avatar : réservés aux comptes JOUEUR.
             target.setAvatarUrl(null);
+            target.setNiveau(null);
+            target.setScoreTotal(null);
+            target.setPointsExperience(null);
+            target.setCurrentStreakDays(null);
+            target.setBestStreakDays(null);
+            target.setLastStreakDate(null);
+        } else if (target.getNiveau() == null) {
+            target.setNiveau(1);
+            target.setScoreTotal(0);
+            target.setPointsExperience(0);
+            target.setCurrentStreakDays(0);
+            target.setBestStreakDays(0);
         }
         target = userRepository.save(target);
         return toDTO(target);
+    }
+
+    @Transactional
+    public UserDTO createStaffUser(com.britechnology.edugame.dto.admin.CreateStaffUserRequest request) {
+        if (request == null) {
+            throw ApiException.badRequest("Données manquantes");
+        }
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        if (email.isEmpty()) {
+            throw ApiException.badRequest("L'e-mail est requis");
+        }
+        if (userRepository.existsByEmail(email)) {
+            throw ApiException.badRequest("Cet e-mail est déjà utilisé");
+        }
+        String roleStr = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
+        Role role;
+        try {
+            role = Role.valueOf(roleStr);
+        } catch (IllegalArgumentException e) {
+            throw ApiException.badRequest("Rôle invalide");
+        }
+        if (role != Role.EDUCATEUR && role != Role.SPONSOR) {
+            throw ApiException.badRequest("Seuls les rôles EDUCATEUR et SPONSOR peuvent être créés ici");
+        }
+        User user = User.builder()
+                .nom(request.getNom().trim())
+                .prenom(request.getPrenom().trim())
+                .email(email)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .dateDeNaissance(request.getDateDeNaissance())
+                .telephone(request.getTelephone())
+                .genre(Genre.parse(request.getGenre()))
+                .role(role)
+                .etatCompte(EtatCompte.ACTIF)
+                .enabled(true)
+                .build();
+        user = userRepository.save(user);
+
+        String roleLabel = role == Role.EDUCATEUR ? "Éducateur" : "Sponsor";
+        emailService.sendStaffAccountCreatedEmail(email, request.getPrenom(), request.getPassword(), roleLabel);
+
+        return toDTO(user);
     }
 
     /**
@@ -152,6 +216,7 @@ public class AdminUserService {
                 .email(user.getEmail())
                 .password(null) // jamais exposé en API
                 .telephone(user.getTelephone())
+                .cin(user.getCin())
                 .avatarUrl(AvatarPolicy.publicAvatarUrl(user))
                 .role(user.getRole().name())
                 .etatCompte(user.getEtatCompte())
@@ -166,7 +231,7 @@ public class AdminUserService {
                 .idRegion(user.getRegion() != null ? user.getRegion().getId() : null)
                 .idPays(user.getRegion() != null && user.getRegion().getPays() != null ? user.getRegion().getPays().getId() : null)
                 .onboardingCompleted(user.isOnboardingCompleted())
-                .idGenre(user.getGenre() != null ? user.getGenre().getId() : null)
+                .genre(user.getGenre() != null ? user.getGenre().name() : null)
                 .resetToken(user.getResetToken())
                 .resetTokenExpiry(user.getResetTokenExpiry())
                 .tokenVerification(user.getTokenVerification())

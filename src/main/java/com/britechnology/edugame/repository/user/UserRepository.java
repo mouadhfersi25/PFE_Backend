@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByEmail(String email);
 
+    boolean existsByCin(String cin);
+
     @Query("""
             select new com.britechnology.edugame.dto.player.SoloLeaderboardEntryDTO(
                 u.id,
@@ -150,5 +152,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     List<User> findByParentIdOrderByPrenomAscNomAsc(Long parentId);
 
     List<User> findByRoleOrderByPrenomAscNomAsc(Role role);
+
+    @Query("""
+            select u from User u
+            left join fetch u.region r
+            left join fetch r.pays
+            left join fetch u.parent
+            where lower(u.email) = lower(:email)
+            """)
+    Optional<User> findByEmailWithProfile(@Param("email") String email);
 }
 

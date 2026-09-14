@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.Convert;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.FetchType;
@@ -51,6 +52,18 @@ public class User {
 
     private String telephone;
 
+    /**
+     * Pour les comptes PARENT : pays choisi à l'inscription (nom tel que renvoyé par
+     * l'API countriesnow, ex. "Tunisia"). Sert de valeur par défaut lors de l'onboarding
+     * des joueurs (enfants) rattachés à ce parent.
+     */
+    @Column(name = "pays_preference", length = 150)
+    private String paysPreference;
+
+    /** Carte d'identité nationale (surtout comptes PARENT). */
+    @Column(length = 20)
+    private String cin;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
@@ -81,8 +94,8 @@ public class User {
     @Builder.Default
     private boolean onboardingCompleted = false;
 
-    @ManyToOne
-    @JoinColumn(name = "id_genre")
+    @Column(name = "genre", length = 20)
+    @Convert(converter = GenreConverter.class)
     private Genre genre;
 
     /**
@@ -103,6 +116,15 @@ public class User {
 
     @Column(updatable = false)
     private LocalDateTime dateCreation;
+
+    /** Nombre d'échecs de connexion consécutifs (protection anti brute-force). */
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    /** Si renseigné et dans le futur, le compte est temporairement verrouillé. */
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 
     @PrePersist
     protected void onCreate() {

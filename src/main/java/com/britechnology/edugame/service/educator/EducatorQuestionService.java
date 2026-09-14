@@ -34,7 +34,7 @@ public class EducatorQuestionService {
 
     public List<QuizQuestionDTO> listByGame(Long jeuId) {
         if (jeuId == null) {
-            throw ApiException.badRequest("jeuId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         Jeu jeu = jeuRepository.findById(jeuId)
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
@@ -58,7 +58,7 @@ public class EducatorQuestionService {
     @Transactional
     public QuizQuestionDTO create(CreateQuizQuestionRequest request) {
         if (request == null || request.getJeuId() == null) {
-            throw ApiException.badRequest("jeuId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         Jeu jeu = jeuRepository.findById(request.getJeuId())
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
@@ -75,7 +75,10 @@ public class EducatorQuestionService {
         );
         String mediaUrl = trimToNull(request.getMediaUrl());
         String promptAudioUrl = trimToNull(request.getPromptAudioUrl());
-        QuizQuestionContentValidator.validateVariantMedia(sousType, mediaUrl, promptAudioUrl);
+        // Pas de validateVariantMedia ici : le flux front est create() SANS média puis
+        // upload séparé (uploadMedia/uploadPromptAudio) une fois la question créée — exiger le
+        // média dès la création bloquait systématiquement toute question IMAGE_WORD/AUDIO_COLOR.
+        // Le média requis reste vérifié avant soumission du jeu (validateGameContentBeforeSubmit).
         Question question = Question.builder()
                 .jeu(jeu)
                 .contenu(resolved.contenu())

@@ -8,10 +8,12 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class SponsorDashboardStatsDTO {
+    private Integer totalCampaigns;
     private Integer activeCampaigns;
+    private Integer pausedCampaigns;
     private Integer totalImpressions;
     private Integer totalClicks;
-    private Double ctr;
     private Integer distributedRewards;
     private Integer rewardStock;
+    private Integer pendingRewardRequests;
 }

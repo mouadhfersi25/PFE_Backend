@@ -15,4 +15,7 @@ public interface ReclamationRepository extends JpaRepository<Reclamation, Long> 
     List<Reclamation> findByStatutOrderByCreatedAtDesc(StatutReclamation statut);
 
     List<Reclamation> findAllByOrderByCreatedAtDesc();
+
+    /** Signalements traités concernant les jeux d'un éducateur donné (pour ses notifications). */
+    List<Reclamation> findByJeu_Educateur_IdAndStatutOrderByCreatedAtDesc(Long educateurId, StatutReclamation statut);
 }

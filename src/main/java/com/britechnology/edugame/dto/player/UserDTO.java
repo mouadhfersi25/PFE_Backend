@@ -30,6 +30,7 @@ public class UserDTO {
     private String password;
 
     private String telephone;
+    private String cin;
     private String avatarUrl;
 
     private String role;
@@ -55,8 +56,8 @@ public class UserDTO {
 
     /** Joueur a complété pays/région/ville */
     private boolean onboardingCompleted;
-    /** id_genre (FK vers genres) */
-    private Long idGenre;
+    /** Genre déclaré à l'inscription (HOMME / FEMME). */
+    private String genre;
 
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
@@ -68,4 +69,11 @@ public class UserDTO {
 
     /** Id du compte PARENT si cet utilisateur est un JOUEUR rattaché. */
     private Long idParent;
+
+    /**
+     * Pays choisi par le compte PARENT à son inscription, si ce joueur lui est rattaché.
+     * Utilisé côté frontend comme valeur par défaut lors de l'onboarding du joueur
+     * (pré-sélection du pays, modifiable par l'utilisateur).
+     */
+    private String parentPaysNom;
 }

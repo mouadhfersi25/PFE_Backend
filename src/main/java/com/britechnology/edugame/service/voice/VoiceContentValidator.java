@@ -40,7 +40,14 @@ public final class VoiceContentValidator {
 
     public static void requireDraft(VoiceSeries series) {
         if (series.getEtat() != EtatVoiceSeries.BROUILLON) {
-            throw ApiException.badRequest("Seules les séries en brouillon peuvent être modifiées");
+            throw ApiException.badRequest("Seules les séries en brouillon peuvent être publiées");
+        }
+    }
+
+    /** Modifications autorisées en brouillon ou publiée ; archivée = lecture seule. */
+    public static void requireEditable(VoiceSeries series) {
+        if (series.getEtat() == EtatVoiceSeries.ARCHIVE) {
+            throw ApiException.badRequest("Désarchivez la série avant de la modifier");
         }
     }
 

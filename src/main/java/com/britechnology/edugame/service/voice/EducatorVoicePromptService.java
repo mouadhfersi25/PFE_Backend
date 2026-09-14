@@ -33,10 +33,10 @@ public class EducatorVoicePromptService {
     @Transactional
     public VoicePromptDTO create(CreateVoicePromptRequest request, String educatorEmail) {
         if (request == null || request.getSeriesId() == null) {
-            throw ApiException.badRequest("seriesId est requis");
+            throw ApiException.badRequest("L'identifiant de la série est requis");
         }
         VoiceSeries series = loadOwnedSeries(request.getSeriesId(), educatorEmail);
-        VoiceContentValidator.requireDraft(series);
+        VoiceContentValidator.requireEditable(series);
         VoiceContentValidator.validatePromptText(request.getTexteReference());
 
         int ordre = request.getOrdre() != null
@@ -65,7 +65,7 @@ public class EducatorVoicePromptService {
             throw ApiException.badRequest("Consigne sans série");
         }
         loadOwnedSeries(series.getId(), educatorEmail);
-        VoiceContentValidator.requireDraft(series);
+        VoiceContentValidator.requireEditable(series);
 
         if (request.getTexteReference() != null) {
             VoiceContentValidator.validatePromptText(request.getTexteReference());
@@ -90,7 +90,7 @@ public class EducatorVoicePromptService {
             throw ApiException.badRequest("Consigne sans série");
         }
         loadOwnedSeries(series.getId(), educatorEmail);
-        VoiceContentValidator.requireDraft(series);
+        VoiceContentValidator.requireEditable(series);
         voicePromptRepository.delete(prompt);
     }
 

@@ -13,7 +13,9 @@ public class RecompenseDTO {
     private String description;
     private Integer scoreMin;
     private String typeRecompense;
+    private Long sponsorId;
     private String sponsorNom;
+    private String sponsorEmail;
     private Integer stockTotal;
     private Integer stockRemaining;
     private Integer distributedCount;

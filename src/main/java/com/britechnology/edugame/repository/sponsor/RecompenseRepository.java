@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface RecompenseRepository extends JpaRepository<Recompense, Long> {
     List<Recompense> findAllByOrderByIdDesc();
+    List<Recompense> findBySponsorIdOrderByIdDesc(Long sponsorId);
+    long countByActiveTrue();
 }

@@ -78,6 +78,25 @@ public class EducatorGameController {
         return ResponseEntity.ok(educatorGameService.submitGame(id));
     }
 
+    /**
+     * PATCH /api/educator/games/{id}/request-reactivation
+     * Le jeu a été corrigé après désactivation admin : l'éducateur demande sa réactivation.
+     */
+    @PatchMapping("/{id}/request-reactivation")
+    public ResponseEntity<GameDTO> requestReactivation(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorGameService.requestReactivation(id));
+    }
+
+    /**
+     * PATCH /api/educator/games/{id}/cancel-reactivation-request
+     * Annule une demande de réactivation envoyée par erreur, tant que l'admin n'a pas statué :
+     * redonne l'accès à la modification du jeu.
+     */
+    @PatchMapping("/{id}/cancel-reactivation-request")
+    public ResponseEntity<GameDTO> cancelReactivationRequest(@PathVariable Long id) {
+        return ResponseEntity.ok(educatorGameService.cancelReactivationRequest(id));
+    }
+
     @PostMapping("/{id}/cover/generate")
     public ResponseEntity<GameDTO> generateCover(@PathVariable Long id) {
         Jeu jeu = jeuRepository.findById(id).orElseThrow(() -> ApiException.notFound("Jeu introuvable"));

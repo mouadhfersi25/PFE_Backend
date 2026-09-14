@@ -29,11 +29,11 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = readAuthHeader(accessor);
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                throw new IllegalArgumentException("Missing websocket auth token");
+                throw new IllegalArgumentException("Jeton d'authentification WebSocket manquant");
             }
             String token = authHeader.substring(7).trim();
             if (!jwtUtil.isTokenValid(token)) {
-                throw new IllegalArgumentException("Invalid websocket auth token");
+                throw new IllegalArgumentException("Jeton d'authentification WebSocket invalide");
             }
             String email = jwtUtil.extractEmail(token);
             String role = jwtUtil.extractRole(token);

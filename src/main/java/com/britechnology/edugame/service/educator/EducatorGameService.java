@@ -9,7 +9,6 @@ import com.britechnology.edugame.entity.GameReviewHistory;
 import com.britechnology.edugame.entity.Jeu;
 import com.britechnology.edugame.entity.PuzzleLogique;
 import com.britechnology.edugame.entity.Question;
-import com.britechnology.edugame.entity.QuizPlayMode;
 import com.britechnology.edugame.entity.QuizVariant;
 import com.britechnology.edugame.entity.Role;
 import com.britechnology.edugame.entity.TypeJeu;
@@ -78,13 +77,11 @@ public class EducatorGameService {
                 .typeJeu(request.getTypeJeu())
                 .modeJeu(request.getModeJeu())
                 .dureeMinutes(request.getDureeMinutes())
-                .icone(request.getIcone() != null && !request.getIcone().trim().isEmpty() ? request.getIcone().trim() : null)
                 .coverImageUrl(request.getCoverImageUrl() != null && !request.getCoverImageUrl().trim().isEmpty() ? request.getCoverImageUrl().trim() : null)
                 .actif(request.getActif() != null ? request.getActif() : true)
                 .etat(EtatJeu.BROUILLON)
                 .dateCreation(LocalDateTime.now())
                 .educateur(educator)
-                .quizPlayMode(resolveQuizPlayMode(request.getTypeJeu(), request.getQuizPlayMode()))
                 .quizVariant(resolveQuizVariant(request.getTypeJeu(), request.getQuizVariant()))
                 .build();
         jeu = jeuRepository.save(jeu);
@@ -105,15 +102,11 @@ public class EducatorGameService {
         if (request.getTypeJeu() != null) jeu.setTypeJeu(request.getTypeJeu());
         if (request.getModeJeu() != null) jeu.setModeJeu(request.getModeJeu());
         if (request.getDureeMinutes() != null) jeu.setDureeMinutes(request.getDureeMinutes());
-        if (request.getIcone() != null) jeu.setIcone(request.getIcone().trim().isEmpty() ? null : request.getIcone().trim());
         if (request.getCoverImageUrl() != null) jeu.setCoverImageUrl(request.getCoverImageUrl().trim().isEmpty() ? null : request.getCoverImageUrl().trim());
-        if (request.getActif() != null) jeu.setActif(request.getActif());
-        if (request.getQuizPlayMode() != null || request.getTypeJeu() != null) {
-            TypeJeu effectiveType = request.getTypeJeu() != null ? request.getTypeJeu() : jeu.getTypeJeu();
-            QuizPlayMode requestedMode = request.getQuizPlayMode() != null
-                    ? request.getQuizPlayMode()
-                    : jeu.getQuizPlayMode();
-            jeu.setQuizPlayMode(resolveQuizPlayMode(effectiveType, requestedMode));
+        // Une fois le jeu ACCEPTE, la visibilité (actif) n'est plus pilotée par l'éducateur : elle
+        // suit uniquement le circuit admin de désactivation/réactivation (signalement joueur).
+        if (request.getActif() != null && jeu.getEtat() != EtatJeu.ACCEPTE) {
+            jeu.setActif(request.getActif());
         }
         if (request.getQuizVariant() != null || request.getTypeJeu() != null) {
             TypeJeu effectiveType = request.getTypeJeu() != null ? request.getTypeJeu() : jeu.getTypeJeu();
@@ -140,6 +133,61 @@ public class EducatorGameService {
         validateGameContentBeforeSubmit(jeu);
         jeu.setEtat(EtatJeu.EN_ATTENTE);
         jeu = jeuRepository.save(jeu);
+        return toDTO(jeu);
+    }
+
+    /**
+     * L'éducateur signale qu'il a corrigé un jeu désactivé (suite à signalement) et demande sa
+     * réactivation. Le jeu reste désactivé (actif=false) et redevient non modifiable tant que
+     * l'admin n'a pas statué (cf. {@link com.britechnology.edugame.service.admin.AdminGameService}).
+     */
+    @Transactional
+    public GameDTO requestReactivation(Long id) {
+        Jeu jeu = jeuRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+
+        if (jeu.getEtat() != EtatJeu.ACCEPTE || jeu.isActif()) {
+            throw ApiException.badRequest("Seul un jeu désactivé peut faire l'objet d'une demande de réactivation");
+        }
+        if (jeu.isReactivationPending()) {
+            throw ApiException.badRequest("Une demande de réactivation est déjà en attente pour ce jeu");
+        }
+
+        jeu.setReactivationPending(true);
+        jeu = jeuRepository.save(jeu);
+
+        gameReviewHistoryRepository.save(GameReviewHistory.builder()
+                .jeu(jeu)
+                .action(GameReviewAction.REACTIVATION_DEMANDEE)
+                .createdAt(LocalDateTime.now())
+                .build());
+
+        return toDTO(jeu);
+    }
+
+    /**
+     * L'éducateur annule sa propre demande de réactivation avant toute décision admin (ex: il a
+     * cliqué par erreur, ou veut d'abord corriger davantage le contenu). Le jeu redevient
+     * modifiable ; aucune notification admin n'est nécessaire puisque la demande n'est plus visible.
+     */
+    @Transactional
+    public GameDTO cancelReactivationRequest(Long id) {
+        Jeu jeu = jeuRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
+
+        if (!jeu.isReactivationPending()) {
+            throw ApiException.badRequest("Aucune demande de réactivation en attente pour ce jeu");
+        }
+
+        jeu.setReactivationPending(false);
+        jeu = jeuRepository.save(jeu);
+
+        gameReviewHistoryRepository.save(GameReviewHistory.builder()
+                .jeu(jeu)
+                .action(GameReviewAction.REACTIVATION_ANNULEE)
+                .createdAt(LocalDateTime.now())
+                .build());
+
         return toDTO(jeu);
     }
 
@@ -235,6 +283,14 @@ public class EducatorGameService {
                 .filter(r -> r.getAction() == GameReviewAction.REFUSE)
                 .map(GameReviewHistory::getMotifRefus)
                 .orElse(null);
+        String latestDeactivationReason = gameReviewHistoryRepository
+                .findTopByJeuIdAndActionOrderByCreatedAtDescIdDesc(jeu.getId(), GameReviewAction.DESACTIVE)
+                .map(GameReviewHistory::getMotifRefus)
+                .orElse(null);
+        String latestReactivationRejectionReason = gameReviewHistoryRepository
+                .findTopByJeuIdAndActionOrderByCreatedAtDescIdDesc(jeu.getId(), GameReviewAction.REACTIVATION_REFUSEE)
+                .map(GameReviewHistory::getMotifRefus)
+                .orElse(null);
 
         return GameDTO.builder()
                 .id(jeu.getId())
@@ -245,23 +301,17 @@ public class EducatorGameService {
                 .ageMax(jeu.getAgeMax())
                 .typeJeu(jeu.getTypeJeu())
                 .modeJeu(jeu.getModeJeu())
-                .quizPlayMode(jeu.getQuizPlayMode())
                 .quizVariant(jeu.getQuizVariant())
                 .actif(jeu.isActif())
+                .reactivationPending(jeu.isReactivationPending())
                 .dureeMinutes(jeu.getDureeMinutes())
-                .icone(jeu.getIcone())
                 .coverImageUrl(jeu.getCoverImageUrl())
                 .etat(jeu.getEtat())
                 .latestRefusalReason(latestRefusalReason)
+                .latestDeactivationReason(latestDeactivationReason)
+                .latestReactivationRejectionReason(latestReactivationRejectionReason)
                 .dateCreation(jeu.getDateCreation())
                 .build();
-    }
-
-    private QuizPlayMode resolveQuizPlayMode(TypeJeu typeJeu, QuizPlayMode requested) {
-        if (typeJeu != TypeJeu.QUIZ) {
-            return QuizPlayMode.CLASSIC;
-        }
-        return requested != null ? requested : QuizPlayMode.CLASSIC;
     }
 
     private QuizVariant resolveQuizVariant(TypeJeu typeJeu, QuizVariant requested) {

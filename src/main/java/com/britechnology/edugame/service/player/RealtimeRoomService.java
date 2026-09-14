@@ -37,6 +37,9 @@ public class RealtimeRoomService {
     public static final int MIN_ONLINE_PLAYERS = 2;
     private static final long ROOM_TTL_MS = 2L * 60L * 60L * 1000L;
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    /** Marge ajoutée à la durée estimée du jeu avant de considérer un joueur silencieux comme abandonné. */
+    private static final int ABANDON_GRACE_MINUTES = 10;
+    private static final int DEFAULT_GAME_DURATION_MINUTES = 10;
 
     private final UserRepository userRepository;
     private final JeuRepository jeuRepository;
@@ -47,7 +50,7 @@ public class RealtimeRoomService {
 
     public synchronized RealtimeRoomStateDTO createRoom(String userEmail, Long gameId) {
         if (gameId == null || gameId <= 0) {
-            throw ApiException.badRequest("gameId invalide");
+            throw ApiException.badRequest("Identifiant de jeu invalide");
         }
         Jeu game = jeuRepository.findById(gameId)
                 .orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
@@ -98,9 +101,77 @@ public class RealtimeRoomService {
         return dto;
     }
 
+    /**
+     * Un joueur quitte la salle — symétrique de {@link #joinRoom}. Si l'hôte part, un autre
+     * membre restant est promu hôte automatiquement. Si la salle devient vide, elle est fermée.
+     * Quitter une partie déjà démarrée compte comme un abandon : les joueurs restants n'ont
+     * plus besoin d'attendre ce joueur pour que le résultat de la salle soit déclaré complet.
+     */
+    public synchronized void leaveRoom(String userEmail, String roomCodeRaw) {
+        User user = findUser(userEmail);
+        String roomCode = normalizeRoomCode(roomCodeRaw);
+        RoomState room = requireRoom(roomCode);
+
+        StatePlayer removed = room.players.remove(user.getId());
+        if (removed == null) {
+            throw ApiException.unauthorized("ROOM_MEMBER_REQUIRED");
+        }
+
+        if (room.players.isEmpty()) {
+            rooms.remove(roomCode);
+            return;
+        }
+
+        if (removed.host) {
+            room.players.values().iterator().next().host = true;
+        }
+
+        broadcast(toDto(room));
+    }
+
+    /**
+     * Abandon en cours de partie (déjà démarrée) : contrairement à {@link #leaveRoom}, le joueur
+     * n'est PAS retiré de la salle — il reste dans le classement final avec le statut
+     * "abandonné" (voir {@link #buildCompetitiveResult}), pour que les autres joueurs le voient
+     * clairement comme ayant perdu par forfait plutôt que de simplement disparaître.
+     * Déclenché soit par un clic explicite sur "Quitter la partie", soit automatiquement à la
+     * fermeture de l'onglet/navigateur (voir le endpoint `/forfeit`, appelable via
+     * navigator.sendBeacon donc sans en-tête d'autorisation classique).
+     */
+    public synchronized void forfeit(String userEmail, String roomCodeRaw) {
+        User user = findUser(userEmail);
+        RoomState room = requireRoom(normalizeRoomCode(roomCodeRaw));
+        StatePlayer player = room.players.get(user.getId());
+        if (player == null || player.abandoned) {
+            return;
+        }
+        player.abandoned = true;
+        // Pousse immédiatement le résultat final aux joueurs encore connectés, plutôt que
+        // d'attendre leur prochaine soumission de score ou le prochain sondage périodique.
+        broadcastCompetitiveResult(room.roomCode);
+    }
+
     public synchronized RealtimeRoomStateDTO getRoom(String roomCodeRaw) {
         String roomCode = normalizeRoomCode(roomCodeRaw);
         return toDto(requireRoom(roomCode));
+    }
+
+    /**
+     * Salles ouvertes (pas encore démarrées, pas encore pleines) qu'un joueur connecté
+     * peut voir et rejoindre — optionnellement filtrées sur un jeu précis.
+     * Purge au passage les salles expirées (TTL dépassé).
+     */
+    public synchronized List<RealtimeRoomStateDTO> listAvailableRooms(Long gameId) {
+        long now = Instant.now().toEpochMilli();
+        rooms.entrySet().removeIf(entry -> now - entry.getValue().createdAt > ROOM_TTL_MS);
+
+        return rooms.values().stream()
+                .filter(room -> room.startedAt == null)
+                .filter(room -> room.players.size() < MAX_PLAYERS)
+                .filter(room -> gameId == null || room.gameId.equals(gameId))
+                .sorted(Comparator.comparingLong((RoomState r) -> r.createdAt).reversed())
+                .map(this::toDto)
+                .toList();
     }
 
     public synchronized RealtimeRoomStateDTO setReady(String userEmail, String roomCodeRaw, boolean ready) {
@@ -224,8 +295,17 @@ public class RealtimeRoomService {
             }
         });
         int completedPlayers = scores.size();
-        boolean complete = completedPlayers == room.players.size();
-        Integer highestScore = complete
+        // Filet de sécurité : si un joueur reste silencieux (onglet fermé, connexion perdue...)
+        // sans jamais soumettre de score, on ne bloque pas indéfiniment les autres joueurs sur
+        // "En attente". Passé la durée estimée du jeu + une marge, la salle est déclarée
+        // complète malgré tout et ce joueur est marqué comme abandonné.
+        boolean timedOut = isRoomTimedOut(room);
+        // Un joueur marqué "abandonné" (forfait explicite ou fermeture du navigateur détectée) est
+        // considéré traité même sans score : plus besoin d'attendre lui pour déclarer la salle complète.
+        boolean allAccountedFor = room.players.values().stream()
+                .allMatch(p -> scores.containsKey(p.id) || p.abandoned);
+        boolean complete = allAccountedFor || timedOut;
+        Integer highestScore = complete && !scores.isEmpty()
                 ? scores.values().stream().max(Integer::compareTo).orElse(0)
                 : null;
         long winnersCount = highestScore == null
@@ -236,8 +316,10 @@ public class RealtimeRoomService {
                 .map(player -> {
                     Integer score = scores.get(player.id);
                     String outcome = "PENDING";
-                    if (complete && score != null) {
-                        if (score.equals(highestScore)) {
+                    if (complete) {
+                        if (score == null) {
+                            outcome = "ABANDONED";
+                        } else if (score.equals(highestScore)) {
                             outcome = winnersCount > 1 ? "DRAW" : "WINNER";
                         } else {
                             outcome = "LOSER";
@@ -262,6 +344,17 @@ public class RealtimeRoomService {
                 .complete(complete)
                 .players(players)
                 .build();
+    }
+
+    /** Vrai si la partie a démarré depuis plus longtemps que sa durée estimée + la marge d'abandon. */
+    private boolean isRoomTimedOut(RoomState room) {
+        if (room.startedAt == null) return false;
+        int durationMinutes = jeuRepository.findById(room.gameId)
+                .map(Jeu::getDureeMinutes)
+                .filter(d -> d != null && d > 0)
+                .orElse(DEFAULT_GAME_DURATION_MINUTES);
+        long timeoutMs = (durationMinutes + ABANDON_GRACE_MINUTES) * 60_000L;
+        return Instant.now().toEpochMilli() - room.startedAt > timeoutMs;
     }
 
     private RoomState requireRoom(String roomCode) {
@@ -330,7 +423,7 @@ public class RealtimeRoomService {
             String code = randomCode();
             if (!rooms.containsKey(code)) return code;
         }
-        throw ApiException.badRequest("Impossible de générer un code room unique");
+        throw ApiException.badRequest("Impossible de générer un code de salle unique");
     }
 
     private String randomCode() {
@@ -344,7 +437,7 @@ public class RealtimeRoomService {
 
     private String normalizeRoomCode(String roomCodeRaw) {
         if (roomCodeRaw == null || roomCodeRaw.isBlank()) {
-            throw ApiException.badRequest("roomCode est requis");
+            throw ApiException.badRequest("Le code de salle est requis");
         }
         return roomCodeRaw.trim().toUpperCase(Locale.ROOT);
     }
@@ -364,6 +457,9 @@ public class RealtimeRoomService {
         private Integer age;
         private boolean ready;
         private boolean host;
+        /** Vrai si ce joueur a quitté la partie en cours (fermeture d'onglet ou clic "Quitter")
+         * sans soumettre de score — il reste visible dans le classement final, marqué "abandonné". */
+        private boolean abandoned;
 
         public String name() {
             return name == null ? "" : name;

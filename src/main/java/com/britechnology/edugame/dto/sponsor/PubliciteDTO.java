@@ -1,10 +1,6 @@
 package com.britechnology.edugame.dto.sponsor;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
@@ -16,12 +12,17 @@ public class PubliciteDTO {
     private String contenu;
     private String status;
     private String typePublicite;
+    /** Conservé pour compatibilité frontend (contient l'URL vidéo). */
     private String imageUrl;
+    private String videoUrl;
     private Integer adDurationSeconds;
     private String ctaLabel;
     private String ctaUrl;
-    private Double budgetUtilise;
     private Integer nbVues;
     private Integer nbClics;
+    private Long sponsorId;
     private String sponsorNom;
+    private String sponsorEmail;
+    private java.util.List<Long> jeuIds;
+    private java.util.List<String> jeuTitres;
 }

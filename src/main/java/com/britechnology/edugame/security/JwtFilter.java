@@ -26,7 +26,12 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path != null && path.startsWith("/api/auth/");
+        if (path == null) path = "";
+        String uri = request.getRequestURI() != null ? request.getRequestURI() : "";
+        return path.startsWith("/api/auth/")
+                || path.startsWith("/auth/")
+                || uri.contains("/api/auth/")
+                || uri.contains("/auth/");
     }
 
     @Override
@@ -38,12 +43,20 @@ public class JwtFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
+        String token;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            // Repli sur un paramètre de requête `token` : nécessaire pour navigator.sendBeacon
+            // (ex. signal d'abandon de partie à la fermeture de l'onglet), qui ne permet pas
+            // d'ajouter d'en-tête Authorization personnalisé.
+            String queryToken = request.getParameter("token");
+            if (queryToken == null || queryToken.isBlank()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            token = queryToken;
         }
-
-        final String token = authHeader.substring(7);
 
         if (!jwtUtil.isTokenValid(token)) {
             filterChain.doFilter(request, response);

@@ -15,16 +15,16 @@ public class SessionLaunchModeValidatorService {
                 throw new IllegalArgumentException("Ce jeu est uniquement disponible en solo hors ligne");
             }
             if (!roomCode.isBlank()) {
-                throw new IllegalArgumentException("Ce jeu est INDIVIDUEL: roomCode ne doit pas être fourni");
+                throw new IllegalArgumentException("Ce jeu est INDIVIDUEL : le code de salle ne doit pas être fourni");
             }
             return;
         }
 
         if (requestedMode != ModeJeu.EN_LIGNE) {
-            throw new IllegalArgumentException("Ce jeu doit être lancé dans une room en ligne");
+            throw new IllegalArgumentException("Ce jeu doit être lancé dans une salle en ligne");
         }
         if (roomCode.isBlank()) {
-            throw new IllegalArgumentException("Ce jeu en ligne exige un roomCode");
+            throw new IllegalArgumentException("Ce jeu en ligne exige un code de salle");
         }
     }
 

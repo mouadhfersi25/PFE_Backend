@@ -160,14 +160,14 @@ public class ScoreCalculatorService {
     private void validateInputCoherence(TypeJeu typeJeu, EtatSession etatSession, CreateGameSessionRequest request, List<String> anomalies) {
         if (request.getTotalQuestions() != null && request.getCorrectAnswers() != null
                 && request.getCorrectAnswers() > request.getTotalQuestions()) {
-            throw new IllegalArgumentException("correctAnswers ne peut pas dépasser totalQuestions");
+            throw new IllegalArgumentException("Le nombre de bonnes réponses ne peut pas dépasser le nombre total de questions");
         }
         if (request.getTotalRounds() != null && request.getSuccessfulRounds() != null
                 && request.getSuccessfulRounds() > request.getTotalRounds()) {
-            throw new IllegalArgumentException("successfulRounds ne peut pas dépasser totalRounds");
+            throw new IllegalArgumentException("Le nombre de manches réussies ne peut pas dépasser le nombre total de manches");
         }
         if (typeJeu == TypeJeu.MEMOIRE && request.getMoves() != null && request.getMoves() < 0) {
-            throw new IllegalArgumentException("moves ne peut pas être négatif");
+            throw new IllegalArgumentException("Le nombre de coups ne peut pas être négatif");
         }
         if (request.getAccuracyPercent() != null && (request.getAccuracyPercent() < 0 || request.getAccuracyPercent() > 100)) {
             anomalies.add("accuracy_out_of_range_clamped");
@@ -180,7 +180,7 @@ public class ScoreCalculatorService {
                     || request.getMoves() != null
                     || request.getAttempts() != null;
             if (hasTerminalMetrics) {
-                throw new IllegalArgumentException("etatSession EN_COURS incohérent avec des métriques de fin de partie");
+                throw new IllegalArgumentException("L'état de session EN_COURS est incohérent avec des métriques de fin de partie");
             }
         }
     }

@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class GenerateQuizPreviewRequest {
 
-    @NotNull(message = "gameId est requis")
+    @NotNull(message = "L'identifiant du jeu est requis")
     private Long gameId;
 
     @Min(value = 1, message = "Le nombre de questions doit être au minimum 1")

@@ -75,7 +75,7 @@ public class AiQuizGenerationService {
             throw ApiException.badRequest("Clé API Gemini absente. Vérifiez GEMINI_API_KEY.");
         }
         if (gameId == null) {
-            throw ApiException.badRequest("gameId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
 
         final int count = normalizeCount(requestedCount);
@@ -116,7 +116,7 @@ public class AiQuizGenerationService {
                 String contenu = cleanText(q.path("contenu").asText(null));
                 String bonneReponse = cleanText(q.path("bonneReponse").asText(null));
                 String explication = cleanText(q.path("explication").asText(null));
-                Integer difficulte = normalizeDifficulty(q.path("difficulte").asInt(jeu.getDifficulte() == null ? 5 : jeu.getDifficulte()));
+                Integer difficulte = normalizeDifficulty(q.path("difficulte").asInt(jeu.getDifficulte() == null ? 5 : jeu.getDifficulte().getWeight()));
                 String sousType = "MIXED".equals(mode)
                         ? normalizeQuestionSousType(cleanText(q.path("sousType").asText(null)))
                         : mode;
@@ -384,7 +384,7 @@ public class AiQuizGenerationService {
     }
 
     private String buildPrompt(Jeu jeu, int count, String mode) {
-        Integer diff = normalizeDifficulty(jeu.getDifficulte());
+        Integer diff = normalizeDifficulty(jeu.getDifficulte() != null ? jeu.getDifficulte().getWeight() : null);
         String ageRange = (jeu.getAgeMin() != null || jeu.getAgeMax() != null)
                 ? (String.valueOf(jeu.getAgeMin() == null ? "?" : jeu.getAgeMin()) + "-" + (jeu.getAgeMax() == null ? "?" : jeu.getAgeMax()))
                 : "non précisée";

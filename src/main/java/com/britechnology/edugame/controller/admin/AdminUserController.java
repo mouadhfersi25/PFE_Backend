@@ -30,9 +30,17 @@ public class AdminUserController {
         return ResponseEntity.ok(users);
     }
 
+    @PostMapping
+    public ResponseEntity<UserDTO> createStaffUser(
+            @jakarta.validation.Valid @RequestBody com.britechnology.edugame.dto.admin.CreateStaffUserRequest request
+    ) {
+        UserDTO created = adminUserService.createStaffUser(request);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(created);
+    }
+
     /**
      * GET /api/admin/users/{id}
-     * Profil d'un utilisateur par id (réservé au rôle ADMIN). Retourne UserDTO (table users).
+     * Profil d'un utilisateur par id (réservé à l'admin). Retourne UserDTO (table users).
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {

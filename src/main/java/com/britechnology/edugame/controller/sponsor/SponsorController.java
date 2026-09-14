@@ -1,5 +1,6 @@
 package com.britechnology.edugame.controller.sponsor;
 
+import com.britechnology.edugame.dto.game.GameDTO;
 import com.britechnology.edugame.dto.sponsor.*;
 import com.britechnology.edugame.service.sponsor.SponsorService;
 import lombok.RequiredArgsConstructor;
@@ -8,7 +9,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/sponsor")
@@ -22,15 +22,28 @@ public class SponsorController {
         return ResponseEntity.ok(sponsorService.getDashboardStats(authentication));
     }
 
+    @GetMapping("/jeux")
+    public ResponseEntity<List<GameDTO>> listGamesForAds(Authentication authentication) {
+        return ResponseEntity.ok(sponsorService.listAvailableGamesForAds(authentication));
+    }
+
     @GetMapping("/publicites")
     public ResponseEntity<List<PubliciteDTO>> listPublicites(Authentication authentication) {
         return ResponseEntity.ok(sponsorService.listPublicites(authentication));
     }
 
+    @GetMapping("/publicites/{id}")
+    public ResponseEntity<PubliciteDTO> getPubliciteById(
+            Authentication authentication,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(sponsorService.getPubliciteById(authentication, id));
+    }
+
     @PostMapping("/publicites")
     public ResponseEntity<PubliciteDTO> createPublicite(
             Authentication authentication,
-            @RequestBody(required = false) Map<String, Object> request
+            @RequestBody CreatePubliciteRequest request
     ) {
         return ResponseEntity.ok(sponsorService.createPublicite(authentication, request));
     }
@@ -39,7 +52,7 @@ public class SponsorController {
     public ResponseEntity<PubliciteDTO> updatePublicite(
             Authentication authentication,
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> request
+            @RequestBody UpdatePubliciteRequest request
     ) {
         return ResponseEntity.ok(sponsorService.updatePublicite(authentication, id, request));
     }

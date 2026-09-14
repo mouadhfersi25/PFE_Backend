@@ -29,6 +29,6 @@ public class ExternalAdsMockController {
 
     private ResponseEntity<Map<String, String>> unauthorized() {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("message", "invalid api key"));
+                .body(Map.of("message", "Clé API invalide"));
     }
 }

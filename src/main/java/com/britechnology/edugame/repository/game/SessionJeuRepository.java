@@ -15,6 +15,11 @@ import java.util.List;
 
 public interface SessionJeuRepository extends JpaRepository<SessionJeu, Long> {
     long countByEtatSession(EtatSession etatSession);
+    long countByJeuId(Long jeuId);
+
+    /** Nombre de parties (toutes sessions confondues) groupé par jeu, pour la liste admin des jeux. */
+    @Query("select s.jeu.id, count(s) from SessionJeu s group by s.jeu.id")
+    List<Object[]> countSessionsGroupedByJeu();
     long countByUtilisateurIdAndJeuIdAndDateDebutAfter(Long userId, Long gameId, LocalDateTime dateDebutAfter);
     long countByUtilisateurIdAndEtatSession(Long userId, EtatSession etatSession);
     long countByUtilisateurIdAndEtatSessionAndJeuTypeJeu(Long userId, EtatSession etatSession, TypeJeu typeJeu);
@@ -49,6 +54,16 @@ public interface SessionJeuRepository extends JpaRepository<SessionJeu, Long> {
     Double averageAccuracyByUserAndType(@Param("userId") Long userId, @Param("typeJeu") TypeJeu typeJeu);
 
     @Query("""
+            select coalesce(avg(s.accuracyPercent), 0)
+            from SessionJeu s
+            where s.utilisateur.id = :userId
+              and s.etatSession = com.britechnology.edugame.entity.EtatSession.TERMINE
+              and s.accuracyPercent is not null
+              and s.accuracyPercent >= 0
+            """)
+    Double averageAccuracyByUser(@Param("userId") Long userId);
+
+    @Query("""
             select coalesce(sum(s.durationSeconds), 0)
             from SessionJeu s
             where s.utilisateur.id = :userId
@@ -56,6 +71,20 @@ public interface SessionJeuRepository extends JpaRepository<SessionJeu, Long> {
               and s.dateDebut >= :fromDate
             """)
     Integer sumDurationSecondsSince(@Param("userId") Long userId, @Param("fromDate") LocalDateTime fromDate);
+
+    /**
+     * Score gagné par le joueur depuis une date donnée (ex: date de création d'une récompense),
+     * pour éviter qu'un score déjà acquis avant la création d'une récompense la rende
+     * immédiatement réclamable.
+     */
+    @Query("""
+            select coalesce(sum(s.scoreGlobal), 0)
+            from SessionJeu s
+            where s.utilisateur.id = :userId
+              and s.etatSession = com.britechnology.edugame.entity.EtatSession.TERMINE
+              and coalesce(s.dateDebut, s.dateFin) >= :fromDate
+            """)
+    Integer sumScoreGlobalByUserSince(@Param("userId") Long userId, @Param("fromDate") LocalDateTime fromDate);
 
     @Query("""
             select case when count(s) > 0 then true else false end

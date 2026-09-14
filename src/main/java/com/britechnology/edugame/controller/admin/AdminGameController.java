@@ -11,8 +11,10 @@ import com.britechnology.edugame.service.educator.EducatorQuestionService;
 import com.britechnology.edugame.service.educator.EducatorReflexService;
 import com.britechnology.edugame.dto.game.CreateGameRequest;
 import com.britechnology.edugame.dto.game.ChangeGameStatusRequest;
+import com.britechnology.edugame.dto.game.DeactivateGameRequest;
 import com.britechnology.edugame.dto.game.GameAiReviewDTO;
 import com.britechnology.edugame.dto.game.GameDTO;
+import com.britechnology.edugame.dto.game.RejectReactivationRequest;
 import com.britechnology.edugame.dto.game.UpdateGameRequest;
 import com.britechnology.edugame.service.admin.AdminGameService;
 import jakarta.validation.Valid;
@@ -140,5 +142,59 @@ public class AdminGameController {
     ) {
         String adminEmail = authentication != null ? authentication.getName() : null;
         return ResponseEntity.ok(adminGameService.changeGameState(id, request.getEtat(), request.getMotifRefus(), adminEmail));
+    }
+
+    /**
+     * PATCH /api/admin/games/{id}/deactivate
+     * Désactive un jeu déjà accepté suite à un signalement joueur validé ; notifie l'éducateur.
+     */
+    @PatchMapping("/{id}/deactivate")
+    public ResponseEntity<GameDTO> deactivateGame(
+            @PathVariable Long id,
+            @Valid @RequestBody DeactivateGameRequest request,
+            Authentication authentication
+    ) {
+        String adminEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(adminGameService.deactivateGame(id, request.getMotif(), adminEmail));
+    }
+
+    /**
+     * PATCH /api/admin/games/{id}/activate
+     * Réactive directement un jeu désactivé (à l'initiative de l'admin) ; notifie l'éducateur.
+     */
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<GameDTO> activateGame(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String adminEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(adminGameService.activateGame(id, adminEmail));
+    }
+
+    /**
+     * PATCH /api/admin/games/{id}/reactivation/accept
+     * Valide la demande de réactivation de l'éducateur : le jeu redevient actif.
+     */
+    @PatchMapping("/{id}/reactivation/accept")
+    public ResponseEntity<GameDTO> acceptReactivation(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        String adminEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(adminGameService.acceptReactivation(id, adminEmail));
+    }
+
+    /**
+     * PATCH /api/admin/games/{id}/reactivation/reject
+     * Refuse la demande de réactivation : le jeu reste désactivé.
+     */
+    @PatchMapping("/{id}/reactivation/reject")
+    public ResponseEntity<GameDTO> rejectReactivation(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectReactivationRequest request,
+            Authentication authentication
+    ) {
+        String adminEmail = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(adminGameService.rejectReactivation(id, request.getMotif(), adminEmail));
     }
 }

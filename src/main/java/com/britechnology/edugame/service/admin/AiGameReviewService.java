@@ -52,7 +52,7 @@ public class AiGameReviewService {
     private boolean enabled;
 
     public GameAiReviewDTO reviewGame(Long gameId) {
-        if (gameId == null) throw ApiException.badRequest("gameId est requis");
+        if (gameId == null) throw ApiException.badRequest("L'identifiant du jeu est requis");
 
         Jeu jeu = jeuRepository.findById(gameId).orElseThrow(() -> ApiException.notFound("Jeu introuvable"));
         if (jeu.getEtat() != EtatJeu.EN_ATTENTE) {

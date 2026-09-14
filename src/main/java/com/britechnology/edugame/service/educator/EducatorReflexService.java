@@ -33,7 +33,7 @@ public class EducatorReflexService {
     @Transactional
     public ReflexSettingsDTO createOrUpdate(CreateOrUpdateReflexSettingsRequest request) {
         if (request == null || request.getJeuId() == null) {
-            throw ApiException.badRequest("jeuId est requis");
+            throw ApiException.badRequest("L'identifiant du jeu est requis");
         }
         if (request.getNombreRounds() == null) {
             throw ApiException.badRequest("nombreRounds est requis");
@@ -104,7 +104,7 @@ public class EducatorReflexService {
             return null;
         }
         if (requested == null) {
-            throw ApiException.badRequest("noGoRatio est requis pour le modèle GO_NO_GO");
+            throw ApiException.badRequest("Le ratio « ne pas aller » est requis pour le modèle Aller / Ne pas aller");
         }
         return Math.max(10, Math.min(90, requested));
     }
@@ -114,7 +114,7 @@ public class EducatorReflexService {
             return null;
         }
         if (requested == null) {
-            throw ApiException.badRequest("choiceTargetCount est requis pour le modèle CHOICE_REACTION");
+            throw ApiException.badRequest("Le nombre de cibles est requis pour le modèle Réaction à choix");
         }
         return Math.max(2, Math.min(6, requested));
     }

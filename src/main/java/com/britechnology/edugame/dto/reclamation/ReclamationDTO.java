@@ -15,6 +15,10 @@ public class ReclamationDTO {
     private Long gameId;
     private String gameTitle;
     private TypeJeu gameType;
+    /** État actuel du jeu (peut avoir changé depuis le signalement, ex. désactivé entre-temps). */
+    private boolean gameActif;
+    /** Détails de désactivation les plus récents pour ce jeu, si applicable (visible par l'éducateur). */
+    private String gameDeactivationReason;
     private Long sessionId;
     private Long playerId;
     private String playerPrenom;

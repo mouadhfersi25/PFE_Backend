@@ -4,6 +4,7 @@ import com.britechnology.edugame.dto.reclamation.CreateReclamationRequest;
 import com.britechnology.edugame.dto.reclamation.ReclamationDTO;
 import com.britechnology.edugame.dto.reclamation.UpdateReclamationRequest;
 import com.britechnology.edugame.entity.EtatJeu;
+import com.britechnology.edugame.entity.GameReviewAction;
 import com.britechnology.edugame.entity.MotifReclamation;
 import com.britechnology.edugame.entity.Reclamation;
 import com.britechnology.edugame.entity.Role;
@@ -11,6 +12,7 @@ import com.britechnology.edugame.entity.StatutReclamation;
 import com.britechnology.edugame.entity.SessionJeu;
 import com.britechnology.edugame.entity.User;
 import com.britechnology.edugame.exception.ApiException;
+import com.britechnology.edugame.repository.game.GameReviewHistoryRepository;
 import com.britechnology.edugame.repository.game.SessionJeuRepository;
 import com.britechnology.edugame.repository.reclamation.ReclamationRepository;
 import com.britechnology.edugame.repository.user.UserRepository;
@@ -32,6 +34,7 @@ public class ReclamationService {
     private final ReclamationRepository reclamationRepository;
     private final SessionJeuRepository sessionJeuRepository;
     private final UserRepository userRepository;
+    private final GameReviewHistoryRepository gameReviewHistoryRepository;
 
     @Transactional
     public ReclamationDTO create(Authentication authentication, CreateReclamationRequest request) {
@@ -88,6 +91,28 @@ public class ReclamationService {
         return reclamationRepository.countByStatut(StatutReclamation.OUVERT);
     }
 
+    /**
+     * Signalements validés (TRAITE) concernant les jeux de l'éducateur connecté — utilisé pour
+     * ses notifications : il doit voir qu'un signalement contre l'un de ses jeux a été accepté,
+     * avec les détails (motif, commentaire du joueur), et si applicable la raison de désactivation.
+     */
+    @Transactional(readOnly = true)
+    public List<ReclamationDTO> listForEducator(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw ApiException.unauthorized("Non authentifié");
+        }
+        User educateur = userRepository.findByEmail(authentication.getName().trim())
+                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+        if (educateur.getRole() != Role.EDUCATEUR) {
+            throw ApiException.forbidden("Réservé aux éducateurs");
+        }
+        return reclamationRepository
+                .findByJeu_Educateur_IdAndStatutOrderByCreatedAtDesc(educateur.getId(), StatutReclamation.TRAITE)
+                .stream()
+                .map(this::toDTO)
+                .toList();
+    }
+
     @Transactional
     public ReclamationDTO updateByAdmin(Authentication authentication, Long id, UpdateReclamationRequest request) {
         User admin = userRepository.findByEmail(authentication.getName())
@@ -141,7 +166,7 @@ public class ReclamationService {
 
     private void validateCreateRequest(CreateReclamationRequest request) {
         if (request.getSessionId() == null || request.getGameId() == null || request.getMotif() == null) {
-            throw ApiException.badRequest("sessionId, gameId et motif sont obligatoires");
+            throw ApiException.badRequest("La session, le jeu et le motif sont obligatoires");
         }
     }
 
@@ -158,11 +183,21 @@ public class ReclamationService {
     private ReclamationDTO toDTO(Reclamation r) {
         User player = r.getUtilisateur();
         User admin = r.getAdmin();
+        Long gameId = r.getJeu() != null ? r.getJeu().getId() : null;
+        boolean gameActif = r.getJeu() != null && r.getJeu().isActif();
+        String deactivationReason = !gameActif && gameId != null
+                ? gameReviewHistoryRepository
+                        .findTopByJeuIdAndActionOrderByCreatedAtDescIdDesc(gameId, GameReviewAction.DESACTIVE)
+                        .map(h -> h.getMotifRefus())
+                        .orElse(null)
+                : null;
         return ReclamationDTO.builder()
                 .id(r.getId())
-                .gameId(r.getJeu() != null ? r.getJeu().getId() : null)
+                .gameId(gameId)
                 .gameTitle(r.getJeu() != null ? r.getJeu().getTitre() : null)
                 .gameType(r.getJeu() != null ? r.getJeu().getTypeJeu() : null)
+                .gameActif(gameActif)
+                .gameDeactivationReason(deactivationReason)
                 .sessionId(r.getSessionJeu() != null ? r.getSessionJeu().getId() : null)
                 .playerId(player != null ? player.getId() : null)
                 .playerPrenom(player != null ? player.getPrenom() : null)

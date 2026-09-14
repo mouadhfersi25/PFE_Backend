@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: edugame-auth-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # "edugame-auth-backend" = nom du conteneur backend (DNS interne au reseau
+      # Docker "edugame-net" cree par le Jenkinsfile) ; 8081 = port interne de l'app.
+      - targets: ["edugame-auth-backend:8081"]

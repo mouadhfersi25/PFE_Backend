@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # "edugame-prometheus" = nom du conteneur Prometheus, meme reseau Docker "edugame-net".
+    url: http://edugame-prometheus:9090
+    isDefault: true
+    editable: true

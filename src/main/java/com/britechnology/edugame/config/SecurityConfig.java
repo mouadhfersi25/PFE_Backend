@@ -54,7 +54,12 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/error"
+                                "/error",
+                                // Scrape Prometheus : pas de JWT possible depuis Prometheus, endpoint
+                                // en lecture seule sans donnee metier. Reseau interne uniquement
+                                // (voir monitoring/), a revoir si le backend est un jour expose publiquement.
+                                "/actuator/health",
+                                "/actuator/prometheus"
                         ).permitAll()
 
                         // ✅ bonne pratique Spring : ADMIN -> ROLE_ADMIN

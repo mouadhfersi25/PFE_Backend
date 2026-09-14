@@ -20,6 +20,14 @@ pipeline {
         APP_PORT = '8081'
         SONAR_PROJECT_KEY = 'edugame-auth-backend'
         SONAR_PROJECT_NAME = 'EduGame Auth Backend'
+
+        // Monitoring (Prometheus scrape /actuator/prometheus, Grafana le visualise).
+        // Meme reseau Docker que le conteneur backend pour que Prometheus le resolve par nom.
+        MONITORING_NETWORK = 'edugame-net'
+        PROMETHEUS_CONTAINER = 'edugame-prometheus'
+        PROMETHEUS_PORT = '9090'
+        GRAFANA_CONTAINER = 'edugame-grafana'
+        GRAFANA_PORT = '3001'
     }
 
     stages {
@@ -165,17 +173,59 @@ pipeline {
 
                     docker pull "$IMAGE:$TAG"
 
+                    docker network create "$MONITORING_NETWORK" 2>/dev/null || true
+
                     docker stop "$CONTAINER_NAME" 2>/dev/null || true
                     docker rm "$CONTAINER_NAME" 2>/dev/null || true
 
                     docker run -d \
                       --name "$CONTAINER_NAME" \
                       --restart unless-stopped \
+                      --network "$MONITORING_NETWORK" \
                       -p "${APP_PORT}:8081" \
                       "$IMAGE:$TAG"
 
                     echo "Conteneur demarre : $CONTAINER_NAME ($IMAGE:$TAG) sur le port $APP_PORT"
                     docker ps --filter "name=$CONTAINER_NAME"
+                '''
+            }
+        }
+
+        stage('Monitoring') {
+            steps {
+                sh '''
+                    set -eu
+                    echo "Deploiement Prometheus + Grafana sur le reseau $MONITORING_NETWORK"
+
+                    docker network create "$MONITORING_NETWORK" 2>/dev/null || true
+
+                    docker stop "$PROMETHEUS_CONTAINER" 2>/dev/null || true
+                    docker rm "$PROMETHEUS_CONTAINER" 2>/dev/null || true
+
+                    docker run -d \
+                      --name "$PROMETHEUS_CONTAINER" \
+                      --restart unless-stopped \
+                      --network "$MONITORING_NETWORK" \
+                      -p "${PROMETHEUS_PORT}:9090" \
+                      -v "$(pwd)/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+                      prom/prometheus:v2.55.1
+
+                    docker stop "$GRAFANA_CONTAINER" 2>/dev/null || true
+                    docker rm "$GRAFANA_CONTAINER" 2>/dev/null || true
+
+                    docker run -d \
+                      --name "$GRAFANA_CONTAINER" \
+                      --restart unless-stopped \
+                      --network "$MONITORING_NETWORK" \
+                      -p "${GRAFANA_PORT}:3000" \
+                      -e GF_SECURITY_ADMIN_USER=admin \
+                      -e GF_SECURITY_ADMIN_PASSWORD=admin \
+                      -v "$(pwd)/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro" \
+                      -v "$(pwd)/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro" \
+                      grafana/grafana:11.3.0
+
+                    echo "Prometheus : http://<host>:$PROMETHEUS_PORT — Grafana : http://<host>:$GRAFANA_PORT (admin/admin, a changer)"
+                    docker ps --filter "name=$PROMETHEUS_CONTAINER" --filter "name=$GRAFANA_CONTAINER"
                 '''
             }
         }

@@ -1,0 +1,141 @@
+{
+  "title": "EduGame Auth Backend - Spring Boot Overview",
+  "uid": "edugame-auth-backend-overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["edugame", "spring-boot"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Uptime",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "process_uptime_seconds{job=\"edugame-auth-backend\"}", "legendFormat": "uptime" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Threads JVM (live)",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [
+        { "expr": "jvm_threads_live_threads{job=\"edugame-auth-backend\"}", "legendFormat": "threads" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Connexions Hikari actives",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [
+        { "expr": "hikaricp_connections_active{job=\"edugame-auth-backend\"}", "legendFormat": "actives" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Taux d'erreur HTTP 5xx (5m)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"edugame-auth-backend\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"edugame-auth-backend\"}[5m]))",
+          "legendFormat": "erreur 5xx"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "CPU process",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "expr": "process_cpu_usage{job=\"edugame-auth-backend\"}", "legendFormat": "cpu process" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Heap JVM (used / max)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"edugame-auth-backend\",area=\"heap\"}",
+          "legendFormat": "used {{id}}"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{job=\"edugame-auth-backend\",area=\"heap\"}",
+          "legendFormat": "max {{id}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "CPU (process vs systeme)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        { "expr": "process_cpu_usage{job=\"edugame-auth-backend\"}", "legendFormat": "process" },
+        { "expr": "system_cpu_usage{job=\"edugame-auth-backend\"}", "legendFormat": "systeme" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Requetes HTTP / s (par statut)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"edugame-auth-backend\"}[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Latence HTTP moyenne (par endpoint)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_sum{job=\"edugame-auth-backend\"}[1m]) / rate(http_server_requests_seconds_count{job=\"edugame-auth-backend\"}[1m])",
+          "legendFormat": "{{uri}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Pool de connexions Hikari",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        { "expr": "hikaricp_connections_active{job=\"edugame-auth-backend\"}", "legendFormat": "actives" },
+        { "expr": "hikaricp_connections_idle{job=\"edugame-auth-backend\"}", "legendFormat": "inactives" },
+        { "expr": "hikaricp_connections_max{job=\"edugame-auth-backend\"}", "legendFormat": "max" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Pauses GC (taux, 5m)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{job=\"edugame-auth-backend\"}[5m])",
+          "legendFormat": "{{action}} / {{cause}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    }
+  ]
+}

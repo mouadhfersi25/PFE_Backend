@@ -43,14 +43,43 @@ pipeline {
         }
 
         stage('Tests & Coverage') {
+            environment {
+                TEST_DB_CONTAINER = 'pfe-backend-test-postgres'
+            }
             steps {
                 sh '''
                     set -eu
                     . scripts/ensure-java-home.sh
+
+                    # Les tests (contextLoads) demarrent tout le contexte Spring, qui a
+                    # besoin d'un vrai Postgres sur localhost:5432 (Flyway + Hikari).
+                    # On lance donc un Postgres jetable le temps de la stage.
+                    docker rm -f "$TEST_DB_CONTAINER" >/dev/null 2>&1 || true
+                    docker run -d --name "$TEST_DB_CONTAINER" \
+                      --network host \
+                      -e POSTGRES_DB=edugame \
+                      -e POSTGRES_USER=postgres \
+                      -e POSTGRES_PASSWORD=mouadh123 \
+                      postgres:16-alpine
+
+                    echo "Attente de PostgreSQL..."
+                    for i in $(seq 1 30); do
+                        if docker exec "$TEST_DB_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then
+                            echo "PostgreSQL pret"
+                            break
+                        fi
+                        sleep 1
+                    done
+
                     ./mvnw -B -q test
                     test -f target/site/jacoco/jacoco.xml
                     echo "Rapport Jacoco : target/site/jacoco/jacoco.xml"
                 '''
+            }
+            post {
+                always {
+                    sh 'docker rm -f "$TEST_DB_CONTAINER" >/dev/null 2>&1 || true'
+                }
             }
         }
 

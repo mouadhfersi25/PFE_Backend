@@ -29,6 +29,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @RequiredArgsConstructor
 public class SponsorService {
 
+    private static final String REQUEST_BODY_REQUIRED = "Le corps de la requête est requis";
+    private static final String STATUS_ACTIVE = "ACTIVE";
+
     private final ExternalAdsClient externalAdsClient;
     private final UserRepository userRepository;
     private final RecompenseRepository recompenseRepository;
@@ -83,7 +86,7 @@ public class SponsorService {
     public PubliciteDTO createPublicite(Authentication authentication, CreatePubliciteRequest request) {
         User user = ensureSponsorAccess(authentication);
         if (request == null) {
-            throw ApiException.badRequest("Le corps de la requête est requis");
+            throw ApiException.badRequest(REQUEST_BODY_REQUIRED);
         }
         String contenu = requireText(request.getContenu(), "Le contenu est obligatoire");
         String videoUrl = resolveVideoUrl(request.getVideoUrl(), request.getImageUrl());
@@ -112,7 +115,7 @@ public class SponsorService {
     public PubliciteDTO updatePublicite(Authentication authentication, Long id, UpdatePubliciteRequest request) {
         Publicite publicite = resolveOwnedPublicite(authentication, id);
         if (request == null) {
-            throw ApiException.badRequest("Le corps de la requête est requis");
+            throw ApiException.badRequest(REQUEST_BODY_REQUIRED);
         }
         if (request.getContenu() != null && !request.getContenu().isBlank()) {
             publicite.setContenu(request.getContenu().trim());
@@ -295,7 +298,7 @@ public class SponsorService {
     public RecompenseDTO updateRecompense(Authentication authentication, Long id, UpdateRecompenseRequest request) {
         Recompense reward = resolveOwnedRecompense(authentication, id);
         if (request == null) {
-            throw ApiException.badRequest("Le corps de la requête est requis");
+            throw ApiException.badRequest(REQUEST_BODY_REQUIRED);
         }
         if (request.getNom() != null && !request.getNom().isBlank()) {
             reward.setNom(request.getNom().trim());
@@ -413,7 +416,7 @@ public class SponsorService {
         return PubliciteDTO.builder()
                 .id(p.getId())
                 .contenu(p.getContenu())
-                .status(Boolean.TRUE.equals(p.getActive()) ? "ACTIVE" : "PAUSED")
+                .status(Boolean.TRUE.equals(p.getActive()) ? STATUS_ACTIVE : "PAUSED")
                 .typePublicite(p.getTypePublicite())
                 .imageUrl(p.getVideoUrl())
                 .videoUrl(p.getVideoUrl())
@@ -539,14 +542,14 @@ public class SponsorService {
                 .sponsorId(sponsor != null ? sponsor.getId() : null)
                 .sponsorNom(sponsorName)
                 .sponsorEmail(sponsor != null ? sponsor.getEmail() : null)
-                .status(Boolean.FALSE.equals(r.getActive()) ? "INACTIVE" : "ACTIVE")
+                .status(Boolean.FALSE.equals(r.getActive()) ? "INACTIVE" : STATUS_ACTIVE)
                 .build();
     }
 
     private RecompenseDTO toRecompenseDTOFromExternalFallbackActive(com.fasterxml.jackson.databind.JsonNode n) {
         RecompenseDTO dto = toRecompenseDTOFromExternal(n);
         if (dto.getStatus() == null || dto.getStatus().isBlank()) {
-            dto.setStatus("ACTIVE");
+            dto.setStatus(STATUS_ACTIVE);
         }
         return dto;
     }

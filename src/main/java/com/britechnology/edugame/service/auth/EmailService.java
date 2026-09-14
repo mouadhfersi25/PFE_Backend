@@ -16,6 +16,12 @@ import jakarta.mail.internet.MimeMessage;
 @Slf4j
 public class EmailService {
 
+    private static final String UTF_8 = "UTF-8";
+    private static final String DEFAULT_GAME_TITLE = "Votre jeu";
+    private static final String GAMES_MANAGE_PATH = "/educator/games/manage";
+    private static final String DEFAULT_NO_DETAILS_MESSAGE = "Aucun détail supplémentaire n'a été fourni.";
+    private static final String GREETING_PREFIX = "Bonjour ";
+
     private final JavaMailSender mailSender;
 
     @Value("${app.frontend-url}")
@@ -66,12 +72,12 @@ public class EmailService {
 
     @Async("taskExecutor")
     public void sendGameApprovedEmail(String toEmail, String gameTitle) {
-        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? "Votre jeu" : gameTitle;
-        String gamesLink = frontendUrl + "/educator/games/manage";
+        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? DEFAULT_GAME_TITLE : gameTitle;
+        String gamesLink = frontendUrl + GAMES_MANAGE_PATH;
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre demande de jeu a été approuvée");
             helper.setText("""
@@ -131,7 +137,7 @@ public class EmailService {
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Ton compte EduGame a été créé 🎉");
             helper.setText("""
@@ -172,7 +178,7 @@ public class EmailService {
             fallback.setTo(toEmail);
             fallback.setSubject("Ton compte EduGame a été créé");
             fallback.setText(
-                    "Bonjour " + safeFirstName + ",\n\n" +
+                    GREETING_PREFIX + safeFirstName + ",\n\n" +
                             safeParentName + " vient de créer ton compte joueur EduGame.\n\n" +
                             "Adresse e-mail : " + toEmail + "\n" +
                             "Mot de passe : " + plainPassword + "\n\n" +
@@ -196,7 +202,7 @@ public class EmailService {
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre compte " + safeRoleLabel + " EduGame a été créé");
             helper.setText("""
@@ -237,7 +243,7 @@ public class EmailService {
             fallback.setTo(toEmail);
             fallback.setSubject("Votre compte " + safeRoleLabel + " EduGame a été créé");
             fallback.setText(
-                    "Bonjour " + safeFirstName + ",\n\n" +
+                    GREETING_PREFIX + safeFirstName + ",\n\n" +
                             "Un administrateur vient de créer votre compte " + safeRoleLabel + " EduGame.\n\n" +
                             "Adresse e-mail : " + toEmail + "\n" +
                             "Mot de passe : " + plainPassword + "\n\n" +
@@ -255,15 +261,15 @@ public class EmailService {
 
     @Async("taskExecutor")
     public void sendGameRejectedEmail(String toEmail, String gameTitle, String refusalReason) {
-        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? "Votre jeu" : gameTitle;
+        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? DEFAULT_GAME_TITLE : gameTitle;
         String safeReason = (refusalReason == null || refusalReason.isBlank())
-                ? "Aucun détail supplémentaire n'a été fourni."
+                ? DEFAULT_NO_DETAILS_MESSAGE
                 : refusalReason.trim();
-        String gamesLink = frontendUrl + "/educator/games/manage";
+        String gamesLink = frontendUrl + GAMES_MANAGE_PATH;
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre demande de jeu a été refusée");
             helper.setText("""
@@ -317,15 +323,15 @@ public class EmailService {
 
     @Async("taskExecutor")
     public void sendGameDeactivatedEmail(String toEmail, String gameTitle, String deactivationReason) {
-        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? "Votre jeu" : gameTitle;
+        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? DEFAULT_GAME_TITLE : gameTitle;
         String safeReason = (deactivationReason == null || deactivationReason.isBlank())
-                ? "Aucun détail supplémentaire n'a été fourni."
+                ? DEFAULT_NO_DETAILS_MESSAGE
                 : deactivationReason.trim();
-        String gamesLink = frontendUrl + "/educator/games/manage";
+        String gamesLink = frontendUrl + GAMES_MANAGE_PATH;
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre jeu a été désactivé suite à un signalement");
             helper.setText("""
@@ -387,12 +393,12 @@ public class EmailService {
      */
     @Async("taskExecutor")
     public void sendReactivationAcceptedEmail(String toEmail, String gameTitle) {
-        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? "Votre jeu" : gameTitle;
-        String gamesLink = frontendUrl + "/educator/games/manage";
+        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? DEFAULT_GAME_TITLE : gameTitle;
+        String gamesLink = frontendUrl + GAMES_MANAGE_PATH;
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre jeu a été réactivé");
             helper.setText("""
@@ -446,15 +452,15 @@ public class EmailService {
      */
     @Async("taskExecutor")
     public void sendReactivationRejectedEmail(String toEmail, String gameTitle, String rejectionReason) {
-        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? "Votre jeu" : gameTitle;
+        String safeTitle = (gameTitle == null || gameTitle.isBlank()) ? DEFAULT_GAME_TITLE : gameTitle;
         String safeReason = (rejectionReason == null || rejectionReason.isBlank())
-                ? "Aucun détail supplémentaire n'a été fourni."
+                ? DEFAULT_NO_DETAILS_MESSAGE
                 : rejectionReason.trim();
-        String gamesLink = frontendUrl + "/educator/games/manage";
+        String gamesLink = frontendUrl + GAMES_MANAGE_PATH;
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre demande de réactivation a été refusée");
             helper.setText("""
@@ -517,11 +523,11 @@ public class EmailService {
     @Async("taskExecutor")
     public void sendAccountSuspendedEmail(String toEmail, String firstName) {
         String safeName = (firstName == null || firstName.isBlank()) ? "" : firstName.trim();
-        String greeting = safeName.isEmpty() ? "Bonjour," : "Bonjour " + safeName + ",";
+        String greeting = safeName.isEmpty() ? "Bonjour," : GREETING_PREFIX + safeName + ",";
 
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, UTF_8);
             helper.setTo(toEmail);
             helper.setSubject("Votre compte EduGame a été suspendu");
             helper.setText("""

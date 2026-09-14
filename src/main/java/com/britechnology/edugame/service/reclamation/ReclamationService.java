@@ -30,6 +30,7 @@ public class ReclamationService {
 
     private static final int COMMENTAIRE_MAX = 1000;
     private static final int AUTRE_MIN_LENGTH = 10;
+    private static final String USER_NOT_FOUND = "Utilisateur introuvable";
 
     private final ReclamationRepository reclamationRepository;
     private final SessionJeuRepository sessionJeuRepository;
@@ -102,7 +103,7 @@ public class ReclamationService {
             throw ApiException.unauthorized("Non authentifié");
         }
         User educateur = userRepository.findByEmail(authentication.getName().trim())
-                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+                .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         if (educateur.getRole() != Role.EDUCATEUR) {
             throw ApiException.forbidden("Réservé aux éducateurs");
         }
@@ -116,7 +117,7 @@ public class ReclamationService {
     @Transactional
     public ReclamationDTO updateByAdmin(Authentication authentication, Long id, UpdateReclamationRequest request) {
         User admin = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+                .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         if (admin.getRole() != Role.ADMIN) {
             throw ApiException.forbidden("Réservé à l'administration");
         }
@@ -157,7 +158,7 @@ public class ReclamationService {
 
     private User requireJoueur(Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> ApiException.notFound("Utilisateur introuvable"));
+                .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         if (user.getRole() != Role.JOUEUR) {
             throw ApiException.badRequest("Seuls les joueurs peuvent envoyer un signalement");
         }

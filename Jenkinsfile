@@ -105,16 +105,14 @@ pipeline {
             steps {
                 withSonarQubeEnv(installationName: 'SonarQube',
                                  credentialsId: 'sonarqube-token') {
-                    // Non-bloquant pour l'instant : le projet est encore loin des seuils
-                    // par defaut ("Sonar way" : 80% couverture, 0 nouvelle issue, etc.).
-                    // On garde la visibilite (stage marquee en echec, build UNSTABLE)
-                    // sans empecher le build Docker / deploiement. A durcir plus tard.
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-                        sh '''
-                            set -eu
-                            node scripts/wait-quality-gate.js
-                        '''
-                    }
+                    // Quality Gate "PFE Realiste" (voir SonarQube > Quality Gates) : seuils
+                    // adaptes a l'etat actuel du projet plutot que le preset "Sonar way"
+                    // (80% couverture, 0 nouvelle issue) inatteignable a ce stade. Redevient
+                    // bloquant maintenant qu'elle reflete des criteres que le code respecte.
+                    sh '''
+                        set -eu
+                        node scripts/wait-quality-gate.js
+                    '''
                 }
             }
         }

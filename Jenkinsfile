@@ -221,7 +221,6 @@ pipeline {
                       -e GF_SECURITY_ADMIN_USER=admin \
                       -e GF_SECURITY_ADMIN_PASSWORD=admin \
                       -v "$(pwd)/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro" \
-                      -v "$(pwd)/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro" \
                       grafana/grafana:11.3.0
 
                     echo "Prometheus : http://<host>:$PROMETHEUS_PORT — Grafana : http://<host>:$GRAFANA_PORT (admin/admin, a changer)"

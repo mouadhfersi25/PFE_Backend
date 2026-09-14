@@ -9,4 +9,8 @@ providers:
     updateIntervalSeconds: 30
     allowUiUpdates: true
     options:
-      path: /etc/grafana/provisioning/dashboards/json
+      # Le JSON du dashboard vit dans ce meme dossier (a cote de ce fichier), pour
+      # n'avoir qu'un seul montage Docker (voir stage Monitoring du Jenkinsfile) --
+      # un second -v imbrique dans /etc/grafana/provisioning (deja monte en lecture
+      # seule) echoue au demarrage du conteneur (mountpoint impossible a creer).
+      path: /etc/grafana/provisioning/dashboards

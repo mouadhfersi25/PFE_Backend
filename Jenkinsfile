@@ -27,7 +27,7 @@ pipeline {
         PROMETHEUS_CONTAINER = 'edugame-prometheus'
         PROMETHEUS_PORT = '9090'
         GRAFANA_CONTAINER = 'edugame-grafana'
-        GRAFANA_PORT = '3001'
+        GRAFANA_PORT = '3030'
     }
 
     stages {

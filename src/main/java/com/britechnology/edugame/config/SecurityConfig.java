@@ -120,7 +120,10 @@ public class SecurityConfig {
         // à chaque fois. setAllowedOriginPatterns reste compatible avec allowCredentials(true).
         configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",
-                "http://127.0.0.1:*"
+                "http://127.0.0.1:*",
+                // Domaine de prod (myedugame.me), derriere le tunnel Cloudflare.
+                "https://myedugame.me",
+                "https://www.myedugame.me"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));

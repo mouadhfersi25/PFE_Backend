@@ -58,8 +58,13 @@ public class SecurityConfig {
                                 // Scrape Prometheus : pas de JWT possible depuis Prometheus, endpoint
                                 // en lecture seule sans donnee metier. Reseau interne uniquement
                                 // (voir monitoring/), a revoir si le backend est un jour expose publiquement.
+                                "/actuator/prometheus",
+                                // /actuator/health (global) + /actuator/health/liveness et /readiness
+                                // (groupes k8s auto-configures par Spring Boot) : utilises par les
+                                // probes readiness/liveness du Deployment k8s (voir infra/k8s/backend.yaml),
+                                // qui n'envoient pas de JWT.
                                 "/actuator/health",
-                                "/actuator/prometheus"
+                                "/actuator/health/**"
                         ).permitAll()
 
                         // ✅ bonne pratique Spring : ADMIN -> ROLE_ADMIN
